@@ -1,0 +1,130 @@
+function [filtRTA, filtRTC1, filtRTC2, eigenvalues] = preprocRTAC_vis(strf,filtidxs, maxeig)
+
+%function [out, strf] = preprocRTAC_Vis(strf)
+%
+%  A visualizer of STRF preprocessed by preprocRTAC
+%
+% INPUT:
+%          [strf] = strf model that was preprocessed by preprocWavelets3d
+%
+% OUTPUT:
+%       [filtRTA] = a matrix of the RTA filter
+%      [filtRTC1] = a matrix of the 1st Eigenvector of the RTC (1st RTC filter)
+%      [filtRTC1] = a matrix of the 2nd Eigenvector of the RTC (2nd RTC filter)
+%
+
+
+idxr = strf.interactIdx.idxr + ((strf.interactIdx.idxrd - 1)*strf.interactIdx.covsz);
+idxc = strf.interactIdx.idxc + ((strf.interactIdx.idxcd - 1)*strf.interactIdx.covsz);
+
+if strf.interactIdx.covtime
+    delays = (strf.covdelays + 1);
+else
+    delays = length(strf.delays);
+end
+
+lines = size(filtidxs,2);
+covstart = 1;
+% if strf.params.RTAC(1)
+%     RTA = strf.w1(1:(strf.covdelays + 1)*strf.interactIdx.covsz,:);
+%     lines = 1;
+%     covstart = (strf.covdelays + 1)*strf.interactIdx.covsz+1;
+% else
+%     RTA = zeros([strf.interactIdx.covsz delays]);
+% end
+
+% if strf.params.RTAC(2)
+
+    RTCsub = strf.w1(covstart:end,:);
+
+    if strf.interactIdx.covtime
+        idx2 =sub2ind([strf.interactIdx.covsz*(strf.covdelays + 1) strf.interactIdx.covsz*(strf.covdelays + 1)], idxr, idxc);
+        RTC = squeeze(zeros([strf.interactIdx.covsz*(strf.covdelays + 1) strf.interactIdx.covsz*(strf.covdelays + 1)]));
+        RTC(idx2) = RTCsub;
+        [u,s,v] = svds(RTC, maxeig);
+        delays = double(strf.covdelays + 1);
+    else
+        
+        idx2 =sub2ind([strf.interactIdx.covsz strf.interactIdx.covsz], idxr, idxc);
+
+        for ii = 1:delays
+            RTC = squeeze(zeros([strf.interactIdx.covsz strf.interactIdx.covsz]));
+        
+            RTC(idx2) = RTCsub(:,ii);
+
+            RTC = RTC + tril(RTC', -1);
+
+            [u(:,:,ii),s(:,:,ii),v(:,:,ii)] = svd(RTC);
+
+        end
+    end
+    
+    icaparams = eigwindowICA;
+
+    icasig = eigwindowICA(u, icaparams);
+    % [icasig] = ic_fastica(u','verbose', 'off', 'g', 'gauss');
+    
+    % [icasig,Wopt]=fast_RADICAL(u')
+    
+    % [icasig, St]=stJADE(RTC, 'lastEig', maxeig);
+    % [Ss, icasig]=stJADE(u');
+
+    
+    % [A, W] = fastica (u','verbose', 'off');
+    % [icasig] = fastica(u','verbose', 'off');
+% else
+%     u = zeros([strf.interactIdx.covsz 2 delays]);
+% end
+
+% filtRTA = reshape(RTA, [sqrt(strf.interactIdx.covsz) sqrt(strf.interactIdx.covsz) delays]);
+% filtRTC1 = reshape(u(:,1,:), [sqrt(strf.interactIdx.covsz) sqrt(strf.interactIdx.covsz) delays]);
+% filtRTC2 = reshape(u(:,2,:), [sqrt(strf.interactIdx.covsz) sqrt(strf.interactIdx.covsz) delays]);
+
+cnt=1;
+for ii=filtidxs
+    filts(:,:,:,cnt) = reshape(icasig(ii,:), [sqrt(strf.interactIdx.covsz) sqrt(strf.interactIdx.covsz) delays]);
+    maxs(cnt) = max([squeeze(max(max(abs(filts(:,:,:,cnt))))); 1e-6]);
+    cnt=cnt+1;
+end
+
+%  Plot results -----------
+% if strf.params.RTAC(2)
+for yy = 1:size(s,3)
+figure;
+plot(diag(s(:,:,yy)), 'o'); % examine eigenvalues
+title('eigenvalues');
+eigenvalues(:,yy) = diag(s(:,:,yy));
+end
+% end
+
+% RTAmax = max([abs(filtRTA(:)); 1e-6]);
+% RTC1max = max([abs(filtRTC1(:)); 1e-6]);
+% RTC2max = max([abs(filtRTC2(:)); 1e-6]);
+f2 = figure;
+set(f2, 'Position', [150 150 1000 500]);
+colormap gray;
+
+for ff = 1:size(filtidxs,2)
+    for dd = 1:delays
+        subplot(lines,delays,(ff-1)*delays+dd); imagesc(filts(:,:,dd,ff), [-maxs(ff) maxs(ff)]); axis image; axis off; 
+            % if ff == 1
+            %     title(['RTA: ' num2str(-dd+1)]);
+            % else
+                title([sprintf('RTC%s', num2str(filtidxs(ff))) ': ' num2str(-dd+1)]);
+            % end
+    end
+end
+
+
+% for iii = 1:delays
+%     % if strf.params.RTAC(1)
+%         % subplot(lines,delays,iii); imagesc(filtRTA(:,:,iii), [-RTAmax RTAmax]); axis image; axis off; title(['RTA: ' num2str(-iii+1)]);
+%         % nextline = delays;
+%     % else
+%         nextline = 0;
+%     % end
+%     % if strf.params.RTAC(2)
+%         subplot(lines,delays,iii+nextline); imagesc(filtRTC1(:,:,iii), [-RTC1max RTC1max]); axis image; axis off; title(['RTC1: ' num2str(-iii+1)]);
+%         subplot(lines,delays,iii+nextline+delays); imagesc(filtRTC2(:,:,iii), [-RTC2max RTC2max]); axis image; axis off; title(['RTC2: ' num2str(-iii+1)]);
+%     % end
+% end

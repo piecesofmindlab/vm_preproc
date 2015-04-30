@@ -1,0 +1,408 @@
+classdef preprocStep
+    properties
+        fn
+        S
+        params
+        dbi
+        sDir
+        tmpDir
+    end
+    methods
+        function self = preprocStep(fn,S,params,dbi,sDir,tmpDir)
+            % Usage: ppStep = preprocStep(fn,S,params [,dbi] [,tmpDir])
+            %
+            % Generalized preprocessing step in preproc pipeline.
+            % 
+            % Inputs:
+            %   fn : preprocessing function function name
+            %   S : Stimulus / input, which can be a previous stage of preprocessing)stimulus (S) 
+            %   params : parameters for the preproc function. 
+            %       **The following params fields affect ppStep directly:**
+            %       .dbCache
+            %       .concatenatePreprocessedStimulus
+            % 
+            % Optional Inputs (only necessary if params.dbCache == true):
+            %   dbi: mlabSTRFdb object for storing results in database
+            %   sDir : directory in which to save output
+            %   tmpDir : directory in which to save temporary intermediate
+            %       files
+            % 
+            % Outputs: 
+            %   ppStep : ppStep object
+            % 
+            % ** For additional notes, see code! ** 
+            % 
+            % ML 2013.03
+            
+            %%% -- NOTES --- %%%
+            % 
+            % The most confusing / complex aspects of this code deal with
+            % multi-part stimuli. It is necessary to break up large movie
+            % stimuli since they are too large to fit in RAM all at once.
+            % Once the stimulus is broken up into parts (which are
+            % saved/loaded separtely), they must be re-combined at some
+            % stage of processing. This functionality is governed by 
+            % concatenatePreprocessedStimulus in the params struct, as well
+            % as the variable Is_Concat.
+            
+            self.fn = fn;
+            self.S = S;
+            self.params = params;
+            if exist('dbi','var')
+                self.dbi = dbi;
+            end
+            if exist('sDir','var')
+                self.sDir = sDir;
+            end
+            if exist('tmpDir','var') && ~isempty(tmpDir)
+                self.tmpDir = tmpDir;
+            end
+        end
+        
+        function varargout = run(self,clusterOpts)
+            % Run the specified preprocessing stream.
+            %
+            % clusterOpts is an optional struct array; if it exists, it
+            %   will call a cluster instance of this function to run this
+            %   job. clusterOpts has fields:
+            %     .clusterFn = function to call a string of matlab commands
+            %       via your cluster. for Gallant lab, 'slurm_sbatch'
+            %     .jobParams = parameter argument for (slurm or other
+            %       cluster) jobs.
+            %
+            % ML 2013.03
+            
+            if ~exist('clusterOpts','var')
+                clusterOpts = [];
+            end
+            % Process job on cluster
+            if ~isempty(clusterOpts)
+                % Needs functional dbi to work!
+                tmpF = self.dbi.getPath(self.tmpDir);
+                save(tmpF,'self')
+                % This is all particular to Glab cluster setup. Replace?
+                varargout{1} = mlSlurm('self.run',tmpF,clusterOpts.jobParams);
+                if nargout>1
+                    varargout{2} = 'blarg';
+                end
+                return
+            end
+            % Convert stimulus to STRFlab "Stimulus" class
+            if ismember(class(self.S),{'Stimulus','FeatureSpace'})
+                % kill this? 
+                if isempty(self.S(1).n_parts)
+                    self.S(1).n_parts = 1;
+                end
+            elseif isnumeric(self.S)
+                % self.S is provided as a numerical matrix; convert to vm_tools class
+                self.dbi = []; % no database recording of header-less stimuli
+                Opts.stim_class = 'unknown';
+                Opts.part = 1;
+                Opts.n_parts = 1;
+                Opts.hz = 15;
+                self.S = Stimulus(self.S,Opts,self.dbi);
+            else
+                error('S must be a vm_tools class (Stimulus/FeatureSpace) or a numeric matrix')
+            end
+            
+            % Query database for cached versions of stimulus preprocessing
+            if ~isempty(self.dbi)
+                % Check the database for previous (cached) run of this
+                % preprocessing sequence
+                % type must be FeatureSpace
+                qStr.type = 'FeatureSpace';
+                % Preprocessing stream
+                qStr.ppseq = self.params.ppseq;
+                % Only check for all-part stimulus 
+                
+                % Get stimulus from database
+                sdoc = self.S.get_docdict(); % potentially many
+                % Or, just: 
+                %s_ids = {sdoc.([dbi.prefix '_id'])};
+                %qStr.Stimulus = s_ids;
+                if length(qStr.ppseq)==2
+                    % Only one preproc step
+                    %qStr.Stimulus = self.S.dbStruct(AllParts);
+                    qStr.Stimulus = sdoc;
+                else
+                    keyboard;
+                    % Now that preprocessing parameters are not nested,
+                    % this will be more difficult...
+                    qStr.oStimulus = self.S.get_docdict(AllParts);
+                    while isfield(qStr.oStimulus,'Stimulus')
+                        % Get to the bottom of the rabbit hole, bring back original stimulus:
+                        qStr.oStimulus = qStr.oStimulus.Stimulus;
+                    end
+                end
+                disp('Searching for completed preprocessing of:')
+                disp(qStr.ppseq)
+                props = self.dbi.query(qStr);
+                if ~isempty(props)
+                    % Preprocessing has been run on this stimulus with these parameters
+                    if iscell(props)
+                        error('Stimuli with different parameters returned from dbi query! please check your stimulus encoding and try again!')
+                    end
+                    disp('Found preprocessed stim in database!')
+                    if ~exist(props(1).path,'file')
+                        % Assume if one part is missing, all are...
+                        disp('Found model, but path has been deleted! Re-preprocessing...')
+                        % do something to preserve path/id??
+                    else
+                        if ~(isfield(self.params,'Is_Overwrite') && self.params.Is_Overwrite)
+                            % If we're not going to overwrite them, return
+                            % cached values
+                            nS = length(props);
+                            paramtmp = struct;
+                            for iPart = 1:nS
+                                if iPart==1
+                                    %keyboard;
+                                    % NOTE: need to check if it really is
+                                    % multi-part, or just an erroneous
+                                    % duplicate of a stimulus/preproc'd stim
+                                    %keyboard;
+                                    % params should be the same for all
+                                    % parts; thus only get them from a file
+                                    % once.
+                                    try
+                                        % .mat file 
+                                        ftmp = matfile(Spreproc.path,'writable',false);
+                                        paramtmp = ftmp.params;
+                                    catch % specific error?
+                                        try
+                                            % .hdf file
+                                            paramtmp = h5read(Spreproc(iPart).path,'/params');
+                                        catch
+                                            % may cause errors! not sure if
+                                            % all pp functions have "class"
+                                            % field in their params.
+                                            paramtmp = struct('class',self.params.class);
+                                        end
+                                    end
+
+                                end
+                                idx = [props.part]==iPart;
+                                % Add error? 
+                                % if sum(idx)==0; 
+                                %   error(sprintf('Blaaaa! part %d notfound!',iPart)); 
+                                % end
+                                Spreproc(iPart) = FeatureSpace([],props(idx));
+                                % (Do not load stimulus for multi-part
+                                % stimuli; it's probably too big!)
+                            end
+                            varargout{1} = Spreproc;
+                            if nargout==2
+                                % Get params
+                                varargout{2} = paramtmp;
+                            end
+                            %keyboard;
+                            return
+                        end
+                    end
+                end
+                %keyboard
+                clear qStr;
+            end
+            
+            % Preprocess nested parameters w/ recursive call
+            if isfield(self.params,'PP')
+                % Old:
+                %ppStep = preprocStep(self.params.PP.class,self.S,self.params.PP,self.dbi,self.sDir,self.tmpDir);
+                % if not top-level, save in TEMP preprocessing dir!
+                TempDir = '/auto/k8/tempcache/';
+                ppStep = preprocStep(self.params.PP.class,self.S,self.params.PP,self.dbi,TempDir,self.tmpDir);
+                [self.S,self.params.PP] = ppStep.run();
+            end
+            
+            % Concatenation or not
+            if length(self.S)==1
+                % Always concatenate if stim is not multi-part.
+                % Importantly, this will lead to only saving stim _id info
+                % if the results are NOT concatenated. Thus we will always
+                % be able to search for stim w/ .oStimulus field.
+                Is_Concat = true;
+            else
+                if isfield(self.params,'concatenatePreprocessedStimulus') && ...
+                        self.params.concatenatePreprocessedStimulus
+                    Is_Concat = true;
+                else
+                    Is_Concat = false;
+                end
+            end
+            for iPart = 1:self.S(1).n_parts
+                % Load stimulus matrix, if necessary
+                if iscell(self.S(iPart).S) || isempty(self.S(iPart).S)
+                    Stmp = self.S(iPart).load;
+                else
+                    Stmp = self.S(iPart);
+                end
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                %%%   Run actual code here  %%%
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % Use parameters from training data to compute Spp for
+                % validation data, e.g. for zscore or PCA, when you need to
+                % use the same transformation you created for the training
+                % data:
+                if isfield(self.params,'useTrnParams') && self.params.useTrnParams ...
+                        && isfield(self.S.extras,'trnval') && strcmp(self.S.extras.trnval,'val')
+                    % Get same params from training data. 
+                    % DANGER: may be brittle.
+                    q = self.S.dbStruct(true); % All parts = true
+                    % Get trn stimulus that matches val stimulus
+                    mStim = rmfield(q.oStimulus,{'nFrames','n_parts'});
+                    mStim.trnval = 'trn';
+                    q = struct('type','FeatureSpace','mStim',mStim,'ppseq',{self.params.ppseq},'trnval','trn');
+                    Trn = self.dbi.query(q);
+                    if length(Trn)>1
+                        error('Can''t match trn parameters to val parameters!')
+                    end
+                    TrnIO = matfile(Trn.path);
+                    TrnPP = TrnIO.params;
+                    % Keep previous steps' params for val, replace this
+                    % step w/ trn
+                    if isfield(self.params,'PP');
+                        TrnPP.PP = self.params.PP;
+                    end
+                    self.params = TrnPP;
+                end
+                [SppTmp,ppTmp] = feval(self.fn,Stmp.S,self.params);
+                % In case of not concatenating:
+                % Props to save, if necessary
+                AllParts = false; % do NOT save all parts; save individual parts' specific info
+                props.Stimulus = self.S(iPart).dbStruct(AllParts);
+                sz = size(SppTmp);
+                if length(sz)>2
+                    props.nFrames = sz(end);
+                    props.sz = sz(1:2);
+                elseif length(sz)==2
+                    props.nFrames = size(SppTmp,1);
+                    props.sz = size(SppTmp,2);
+                end
+                props.ppseq = ppTmp.ppseq;
+                props.sHz = self.S(iPart).sHz;
+                props.exp = self.S(iPart).exp;
+                props.session = self.S(iPart).session;
+                props.part = self.S(iPart).part;
+                props.n_parts = self.S(iPart).n_parts;
+                if isfield(self.S(iPart).extras,'trnval')
+                    props.trnval = self.S(iPart).extras.trnval;
+                end
+                % if not concat, save this unique part
+                % Optionally save in database / file
+                if ~Is_Concat && isfield(ppTmp,'dbCache') && ppTmp.dbCache
+                    Spreproc(iPart) = FeatureSpace(SppTmp,props,self.dbi);
+                    fprintf('Saving Preprocessed stimulus w/ steps:\n')
+                    disp(Spreproc(iPart).ppseq)
+                    ID = [self.dbi.prefix '_id'];
+                    if ~isfield(Spreproc(iPart).extras,ID)
+                        Spreproc(iPart).extras.(ID) = self.dbi.getPath('','');
+                        Spreproc(iPart).path = fullfile(self.sDir,[Spreproc(iPart).extras.(ID) '.mat']);
+                    end
+                else
+                    % Create temp file path with no dbi entry if 
+                    % not saving individual parts in the dbi
+                    Spreproc(iPart) = FeatureSpace(SppTmp,props,[]);
+                    Spreproc(iPart).path = fullfile('/tmp/',['TempPreprocFile_' mlabSTRFdb.getUUID() '.mat']);
+                    fprintf('Saving TEMP file of Preprocessed stimulus w/ steps:\n')
+                    disp(Spreproc(iPart).ppseq)
+                    fprintf('at: %s\n',Spreproc(iPart).path)
+                    
+                end
+                Spreproc(iPart).save(ppTmp); % w/ params struct
+                % Clear preprocessed stim to save memory
+                Spreproc(iPart).S = [];
+            end
+            
+            if Is_Concat
+                % re-load Spreproc parts
+                
+                ND = length(Spreproc(1).sz);
+                nFrCum = [0,cumsum([Spreproc(1:end-1).nFrames])];
+                nFrTot = sum([Spreproc.nFrames]);
+                nFr = 0;
+                if ND==1
+                    SppAll = zeros(nFrTot,Spreproc(1).sz);
+                elseif ND==2
+                    SppAll = zeros([Spreproc(1).sz,nFrTot]);
+                end
+                %keyboard
+                for iPart = 1:self.S(1).n_parts
+                    idx = 1:Spreproc(iPart).nFrames;
+                    idx = idx+nFrCum(iPart);
+                    if ND==1
+                        dims = {idx,':'};
+                    elseif ND==2
+                        dims = {':',':',idx};
+                    end
+                    SppAll(dims{:}) = getfield(Spreproc(iPart).load,'S');
+                    if any(strfind(Spreproc(iPart).path,'TempPreprocFile'))
+                        % Get rid of temp files
+                        %delete(Spreproc(iPart).path)
+                    end
+                end
+                
+                % Props to save, if necessary
+                % No harm in over-writing this stuff... _id, _rev, and path
+                % will exist from above
+                props.ppseq = ppTmp.ppseq;
+                props.sHz = self.S(1).sHz;
+                props.exp = self.S(1).exp;
+                props.session = self.S(1).session;
+                props.part = 1;
+                props.n_parts = 1;
+                if isfield(self.S(1).extras,'trnval')
+                    props.trnval = self.S(iPart).extras.trnval;
+                end
+                sz = size(SppAll);
+                if numel(sz)==1
+                    props.nFrames = sz;
+                    props.sz = 1;
+                elseif numel(sz)==2
+                    props.nFrames = size(SppAll,1);
+                    props.sz = size(SppAll,2);
+                elseif numel(sz)>2
+                    props.nFrames = sz(end);
+                    props.sz = sz(1:2);
+                end
+                if ~isempty(self.dbi)
+                    % Get ORIGINAL stimulus from base of all stimuli as separate
+                    % searchable entity
+                    AllParts =  true; % save all parts; do not save individual parts' specific info
+                    props.Stimulus = self.S(1).dbStruct(AllParts);
+                    props.oStimulus = self.S(1).dbStruct(AllParts);
+                    while isfield(props.oStimulus,'Stimulus')
+                        % Get to the bottom of the rabbit hole, bring back original stimulus:
+                        Stmp = Stimulus([],props.oStimulus.Stimulus);
+                        props.oStimulus = Stmp.dbStruct(AllParts);
+                    end
+                end
+                % Create Preprocessed Stimulus class
+                Spreproc = FeatureSpace(SppAll,props,self.dbi);
+                % Optionally save in database / file (already done for
+                % non-concat preprocessed stimuli)
+                if isfield(ppTmp,'dbCache') && ppTmp.dbCache
+                    fprintf('Saving Preprocessed stimulus w/ steps:\n')
+                    disp(Spreproc.ppseq)
+                    ID = [self.dbi.prefix '_id'];
+                    if ~isfield(Spreproc.extras,ID)
+                        Spreproc.extras.(ID) = self.dbi.getPath('','');
+                        Spreproc.path = fullfile(self.sDir,[Spreproc.extras.(ID) '.mat']);
+                    end
+                    Spreproc.save(ppTmp); % w/ params struct
+                end
+            end
+            % Cleanup
+            for iP = 1:self.S(1).n_parts
+                if exist(self.S(iP).path,'file') && any(strfind(self.S(iP).path,'TempPreprocFile'))
+                    % Get rid of temp files from previous preprocesing steps 
+                    delete(self.S(iP).path)
+                end
+            end
+            % Outputs
+            varargout{1} = Spreproc;
+            if nargout>1
+                varargout{2} = ppTmp;
+            end
+            % DONE
+        end
+    end
+end
