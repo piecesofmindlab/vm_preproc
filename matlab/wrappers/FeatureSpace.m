@@ -56,8 +56,8 @@ classdef FeatureSpace
             end
         end
         
-        function qStr = dbStruct(self,AllParts)
-            % Usage: qStr = dbStruct(self,AllParts)
+        function qStr = get_docdict(self,AllParts)
+            % Usage: qStr = get_docdict(self,AllParts)
             %
             % Combines Stimulus properties and "extras" properties into a
             % struct array suitable for searching couch database via
@@ -86,7 +86,7 @@ classdef FeatureSpace
                 if ~ismember(props{ii},toRm)
                     qStr.(props{ii}) = self.(props{ii});
                 end
-                if isfield(qStr,props{ii}) && isempty(qStr.(props{ii})); %(strcmp(qStr.(props{ii}),'')
+                if isfield(qStr,props{ii}) && isempty(qStr.(props{ii})) && ~ismember(props{ii},{'Stimulus','oStimulus'}); %(strcmp(qStr.(props{ii}),'')
                     qStr = rmfield(qStr,props{ii});
                 end
             end
@@ -111,7 +111,7 @@ classdef FeatureSpace
                 AllParts = false;
             end
             % Query database for objects matching parameters of this object
-            Sdict = self.dbi.query(self.dbStruct(AllParts));
+            Sdict = self.dbi.query(self.get_docdict(AllParts));
             n = length(Sdict);
             if iscell(Sdict)
                 error([mfilename ':MultipleDBMatch'],'Query returns structs with different fields! not same stimulus!')
@@ -135,12 +135,13 @@ classdef FeatureSpace
         
         function self = load(self)
             % load stimulus data from files
+            fpath = fullfile(self.path,self.fname);
             try
-                tmp = load(self.path);
+                tmp = load(fpath);
                 self.S = tmp.Spreproc;
             catch ME
                 % Get info first? always store as "S"?
-                self.S = h5read(self.path,'/Spreproc');
+                self.S = h5read(fpath,'/Spreproc');
             end
             sz = size(self.S);
             % Fill n_frames, sz;
@@ -168,7 +169,7 @@ classdef FeatureSpace
             tmp = self.S;
             self.S = [];
             AllParts = false; % always save unique parts only to database
-            SppChk = self.dbStruct(AllParts);
+            SppChk = self.get_docdict(AllParts);
             % Save to database if self.dbi is not empty; to temp file
             % otherwise
             if ~isempty(self.dbi)
@@ -182,7 +183,7 @@ classdef FeatureSpace
                 elseif length(cacheF)>1
                     fprintf(['Somehow there are two stimuli matching your description in the dbi\n'...
                         'This is an unacceptable situation. I have no idea why I did not catch this earlier.\n'...
-                        'I fail. Fuck you very much.\n']);
+                        'I fail. I commit seppuku. GAAAAAAAAA!\n']);
                     error('Attempted to save non-unique stimulus! WTF!')
                     % If you are here, you probably saved a preprocessed
                     % stimulus BEFORE concatenation... maybe?
@@ -207,28 +208,35 @@ classdef FeatureSpace
                 SppChk.trnval = SppChk.Stimulus.trnval;
             end
             % Date run!
-            SppChk.DateRun = datestr(now,'yyyy/mm/dd HH:MM'); %time.strftime('%Y/%M/%d %H:%M')
+            SppChk.date_run = dbDate; %datestr(now,'yyyy/mm/dd HH:MM'); %time.strftime('%Y/%M/%d %H:%M')
             if ~exist('sDir','var')
                 sDir = '/auto/k8/mark/StimDB/';
             end
-            
-            % Save stimulus to database
-            xID = [self.dbi.prefix '_id'];
+            % Save stimulus to database (or wherever)
+            if isempty(self.dbi)
+                tmpdb = mlabSTRFdb;
+                xID = [tmpdb.prefix '_id'];
+            else
+                xID = [self.dbi.prefix '_id'];
+            end
             if ~isfield(SppChk,xID)
-                SppChk.(xID) = self.dbi.getUUID;
+                SppChk.(xID) = mlabSTRFdb.getUUID();
             end
-            
+
             if ~isfield(SppChk,'path') || isempty(SppChk.path)
-                SppChk.path = fullfile(sDir,[SppChk.(xID) '.mat']);
+                SppChk.path = sDir;
             end
-
-            % Save stimulus to database
-            self.dbi.save(SppChk)
-
+            if ~isfield(SppChk,'fname') || isempty(SppChk.fname)
+                SppChk.fname = [SppChk.(xID) '.mat'];
+            end
+            if ~isempty(self.dbi)
+                % Save stimulus to database
+                self.dbi.save(SppChk)
+            end
             % Save preproc stimulus to file
-            % Save meta-data and params w/ fancy save to conserve memory
-            mio = matfile(SppChk.path,'writable',true);
-            mio.props = self.dbStruct;
+            sfile = fullfile(SppChk.path,SppChk.fname);
+            mio = matfile(sfile,'writable',true);
+            mio.props = SppChk;
             mio.Spreproc = tmp;
             if exist('params','var') && ~isempty(params)
                 % Optionally save whole preproc params struct

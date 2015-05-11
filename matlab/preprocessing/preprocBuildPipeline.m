@@ -1,5 +1,5 @@
-function params = preprocBuildPipeline(ppSeq,dbCache,Is_Overwrite,concat)
-% Usage: params = preprocBuildPipeline(ppSeq,dbCache,Is_Overwrite,concat)
+function params = preprocBuildPipeline(ppseq,dbCache,Is_Overwrite,concat)
+% Usage: params = preprocBuildPipeline(ppseq,dbCache,Is_Overwrite,concat)
 %
 % Build a struct array of parameters from a cell array sequence of
 % preprocessing steps in the form:
@@ -31,7 +31,7 @@ if ~exist('dbCache','var')||isempty(dbCache)
     % Default to no saving
     dbCache = false;
 end
-nSteps = length(ppSeq)/2;
+nSteps = length(ppseq)/2;
 if length(dbCache) == 1;
     orig = dbCache;
     dbCache = false(nSteps,1);
@@ -54,8 +54,8 @@ if length(Is_Overwrite) == 1;
 end
 
 % Separate functions from argNums
-ppFn = ppSeq(1:2:end);
-ppArg = ppSeq(2:2:end);
+ppFn = ppseq(1:2:end);
+ppArg = ppseq(2:2:end);
 % Check on length of argNums
 argLen = cellfun(@length,ppArg);
 if any(argLen>1)
@@ -66,7 +66,7 @@ if any(argLen>1)
 end
 % Get bottom-level params
 params = eval([ppFn{1} '_GetMetaParams(' num2str(ppArg{1}) ');']);
-params.ppSeq = ppSeq(1:2);
+params.ppseq = ppseq(1:2);
 if dbCache(1)
     % Optionally, cache each stage of processing in database
     params.dbCache = true;
@@ -90,7 +90,7 @@ for iArg = 2:length(ppArg)
     params.concatenatePreprocessedStimulus = concat(iArg);
     % Set whether to overwrite extant database files or not
     params.Is_Overwrite = Is_Overwrite(iArg);
-    params.ppSeq = ppSeq(1:iArg*2);
+    params.ppseq = ppseq(1:iArg*2);
     params.argNum = ppArg{iArg};
     params.PP = ppTmp;
     ppTmp = params;
