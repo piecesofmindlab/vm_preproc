@@ -42,6 +42,7 @@ pDefault.HorizDiv(end) = inf;
 nVertDivs = 1;
 pDefault.VertDiv = linspace(0,1,nVertDivs+1);
 pDefault.VertDiv(end) = inf;
+pDefault.pixel_norm = false; % normalize all channels by the fraction of the image they occupy
 pDefault.ori_norm = 2; % set to 2 for legacy code; 1 is actually preferred. Will change this default later.
 % The following value for pDefault.DepthDivs comes out to:
 % (0,1.0000, 3.1623, 10.0000, 31.6228,inf), which is a reasonable division of space
@@ -158,6 +159,9 @@ for iS = 1:nIms
                     SppTmp = sum(SppTmp,1);
                     % Normalize across different normalorientation bins
                     SppTmp = SppTmp/norm(SppTmp,params.ori_norm); % ori_norm=1 = L1 (max), 2 = L2 (Euclidean)
+                    if params.pixel_norm
+                        SppTmp = SppTmp * length(nn)/length(dIdx(:));
+                    end
                 else
                     % Special case: one single normal bin
                     % compute the fraction of screen pixels in this screen 
