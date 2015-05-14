@@ -115,13 +115,22 @@ classdef preprocStep
                 % Check the database for previous (cached) run of this preprocessing sequence
                 qStr.type = 'FeatureSpace';
                 qStr.ppseq = self.params.ppseq;
-                sids = self.get_oStimulus_ids(self.S);
-                if length(qStr.ppseq)==2
-                    % Only one preprocessing step, thus just search for Stimulus
-                    qStr.Stimulus = sids;
-                else
-                    qStr.oStimulus = sids;
-                end
+                qStr.oStimulus = self.get_oStimulus_ids(self.S);
+                %if isa(self.S,'Stimulus')
+                %    qStr.Stimulus = self.get_stimulus_ids(self.S);
+                %elseif isa(self.S,'FeatureSpace')
+                %    if ~isfield(self.S.extras,'oStimulus')
+                %        disp('WTF kind of Feature Space are you with no oStimulus!')
+                %        keyboard;
+                %    end
+                %    qStr.oStimulus = self.S.extras.oStimulus;
+                %end                        
+%                 if length(qStr.ppseq)==2
+%                     % Only one preprocessing step, thus just search for Stimulus
+%                     qStr.Stimulus = sids;
+%                 else
+%                     qStr.oStimulus = sids;
+%                 end
                 disp('Searching for completed preprocessing of:')
                 disp(qStr.ppseq)
                 docdict_check = self.dbi.query(qStr);
@@ -204,7 +213,7 @@ classdef preprocStep
             end
             for iPart = 1:self.S(1).n_parts
                 % Load stimulus matrix, if necessary
-                if iscell(self.S(iPart).S) || isempty(self.S(iPart).S)
+                if iscell(self.S(iPart).S) || isstruct(self.S(iPart).S) || isempty(self.S(iPart).S)
                     Stmp = self.S(iPart).load;
                 else
                     Stmp = self.S(iPart);
@@ -390,12 +399,62 @@ classdef preprocStep
             % DONE
         end
         function ids  = get_oStimulus_ids(self,S)
-            ids = cell(length(S),1);
-            for iS = 1:length(S)
-                tmp = S(iS).get_docdict();
-                if isfield(tmp,'oStimulus')
-                    ids{iS} = tmp.oStimulus; % need index for cell array?
-                else
+            % Get ids for original stimulus (oStimulus) from which this
+            % FeatureSpace was computed
+            if isa(S,'FeatureSpace')
+                ids = S.extras.oStimulus;
+                return
+            elseif isa(S,'Stimulus')
+%                 if strcmp(S(1).stim_class,'multi_component')
+%                     fnms = fieldnames(S(1).S);
+%                     for ifn = 1:length(fnms)
+%                         ids.(fnms{ifn}) = {};
+%                     end
+%                     for iS = 1:length(S)
+%                         for ifn = 1:length(fnms)
+%                             tmp = self.get_oStimulus_ids(S(iS).S.(fnms{ifn}));
+%                             ids.(fnms{ifn}) = [ids.(fnms{ifn}),tmp];
+%                         end
+%                     end
+%                     ids.stim_class = 'multi_component';
+%                 end
+%                 ids = cell(length(S),1);
+%                 for iS = 1:length(S)
+%                     tmp = S(iS).get_docdict();
+%                     if isfield(tmp,'oStimulus')
+%                         ids{iS} = tmp.oStimulus; % need index for cell array?
+%                     else
+%                         xID = [self.dbi.prefix '_id'];
+%                         if isfield(tmp,xID)
+%                             ids{iS} = {tmp.(xID)};
+%                         else
+%                             ids{iS} = {};
+%                         end
+%                     end
+%                 end
+%                 ids = [ids{:}];
+                ids = get_stimulus_ids(self,S);
+            end
+        end
+        function ids  = get_stimulus_ids(self,S)
+            % Get Stimulus (or FeatureSpace) from which this FeatureSpace
+            % was computed
+            if isprop(S(1),'stim_class') && strcmp(S(1).stim_class,'multi_component')
+                fnms = fieldnames(S(1).S);
+                for ifn = 1:length(fnms)
+                    ids.(fnms{ifn}) = {};
+                end
+                for iS = 1:length(S)
+                    for ifn = 1:length(fnms)
+                        tmp = self.get_stimulus_ids(S(iS).S.(fnms{ifn}));
+                        ids.(fnms{ifn}) = [ids.(fnms{ifn}),tmp];
+                    end
+                end
+                ids.stim_class = 'multi_component';
+            else
+                ids = cell(length(S),1);
+                for iS = 1:length(S)
+                    tmp = S(iS).get_docdict();
                     xID = [self.dbi.prefix '_id'];
                     if isfield(tmp,xID)
                         ids{iS} = {tmp.(xID)};
@@ -403,21 +462,8 @@ classdef preprocStep
                         ids{iS} = {};
                     end
                 end
+                ids = [ids{:}];
             end
-            ids = [ids{:}];
-        end
-        function ids  = get_stimulus_ids(self,S)
-            ids = cell(length(S),1);
-            for iS = 1:length(S)
-                tmp = S(iS).get_docdict();
-                xID = [self.dbi.prefix '_id'];
-                if isfield(tmp,xID)
-                    ids{iS} = {tmp.(xID)};
-                else
-                    ids{iS} = {};
-                end
-            end
-            ids = [ids{:}];
         end
     
     end

@@ -76,7 +76,7 @@ classdef Stimulus
                     disp('Setting size')
                     self.sz = SzTmp(1:2);
                     self.n_frames = SzTmp(end);
-                elseif ismatrix(self.S)
+                elseif ismatrix(self.S) && ~isstruct(self.S) % don't do this for multi-component stimuli
                     if SzTmp(1)==SzTmp(2)
                         warning('Ambiguous Stimulus! Assuming image, 1 time frame.');
                         self.sz = SzTmp;
@@ -152,30 +152,29 @@ classdef Stimulus
             if ~exist('AllParts','var')
                 AllParts = false;
             end
-            if strcmp(self.stim_class,'MultiComponent')
+            if strcmp(self.stim_class,'multi_component')
                 % Multi-component stimulus!
-                for iC = 1:length(self.extras.Components)
-                    qS = self.get_docdict(AllParts);
-                    qS = rmfield(qS,'Components');
-                    qS.stim_class = self.extras.Components{iC};
-                    if isfield(qS,'sz')
-                        %  Always provide sz as a cell w/ 1 entry for each
-                        %  component!
-                        qS.sz = self.sz{iC};
-                    end
-                    tmpS{iC} = Stimulus([],qS,self.dbi); %#ok<AGROW>
-                    tmpS{iC} = tmpS{iC}.dbGet(AllParts); %#ok<AGROW>
+                fnms = fieldnames(self.S);
+                Lchk = zeros(length(fnms),1);
+                for iC = 1:length(fnms)
+                    fnm = fnms{iC};
+                    qS = self.S.(fnms{iC});
+                    out.(fnm) = Stimulus([],qS,self.dbi); 
+                    out.(fnm) = out.(fnm).dbGet(AllParts); 
+                    Lchk(iC) = length(out.(fnm));
                 end
                 % Double-checks for consistency
-                L = cellfun(@length,tmpS);
-                if ~all(L==L(1))
+                if ~all(Lchk==Lchk(1))
                     error('Can''t handle different components with different numbers of parts yet!')
                 end
-                n = L(1);
+                n = Lchk(1);
                 % Split multiple parts 
                 self = repmat(self,[n,1]); 
                 for ii = 1:n
-                    self(ii).S = cellfun(@(x) x(ii),tmpS,'uni',false);
+                    for iC = 1:length(fnms)
+                        fnm = fnms{iC};
+                        self(ii).S.(fnm) = out.(fnm)(ii);
+                    end
                     self(ii).n_parts = n;
                     self(ii).part = ii;
                 end
@@ -213,21 +212,15 @@ classdef Stimulus
         end
         
         function self = load(self)
-%                 if strcmp(self.S(iPart).stim_class,'MultiComponent')
-%                     Stmp = self.S(iPart);
-%                     StmpOrig = Stmp;
-%                     Stmp.S = struct;
-%                     for iComp = 1:length(Stmp.extras.Components);
-%                         s = StmpOrig.S{iComp}.load();
-%                         Stmp.S.(Stmp.extras.Components{iComp}) = s.S;
-%                         clear s;
-%                     end
+            % Load stimulus matrix into memory
             fpath = fullfile(self.path,self.fname);
-            if strcmp(self.stim_class,'MultiComponent')
+            if strcmp(self.stim_class,'multi_component')
                 Stmp = struct;
-                for iComp = 1:length(self.extras.Components);
-                    s = self.S{iComp}.load();
-                    Stmp.(self.extras.Components{iComp}) = s.S;
+                fnms = fieldnames(self.S);
+                for iComp = 1:length(fnms);
+                    fnm = fnms{iComp};
+                    s = self.S.(fnm).load();
+                    Stmp.(fnm) = s.S;
                     clear s;
                 end
                 self.S = Stmp;

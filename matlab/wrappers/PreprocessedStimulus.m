@@ -181,7 +181,7 @@ classdef PreprocessedStimulus
                 elseif length(cacheF)>1
                     fprintf(['Somehow there are two stimuli matching your description in the db\n'...
                         'This is an unacceptable situation. I have no idea why I did not catch this earlier.\n'...
-                        'I fail. Fuck you very much.\n']);
+                        'I fail. Bite me very much.\n']);
                     error('Attempted to save non-unique stimulus! WTF!')
                     % If you are here, you probably saved a preprocessed
                     % stimulus BEFORE concatenation... maybe?
@@ -206,7 +206,7 @@ classdef PreprocessedStimulus
                 SppChk.trnval = SppChk.Stimulus.trnval;
             end
             % Date run!
-            SppChk.DateRun = datestr(now,'yyyy/mm/dd HH:MM'); %time.strftime('%Y/%M/%d %H:%M')
+            SppChk.date_run = datestr(now,'yyyy/mm/dd HH:MM'); %time.strftime('%Y/%M/%d %H:%M')
             if ~exist('sDir','var')
                 sDir = '/auto/k8/mark/StimDB/';
             end
