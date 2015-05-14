@@ -5,6 +5,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Matlab temp files
+*.m~
+
 # Distribution / packaging
 .Python
 env/

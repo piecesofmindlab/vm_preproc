@@ -577,8 +577,28 @@ switch Arg(1)
         % Keep normals in screen coordinates
         params.normParams.removeComponent = [0,0,0];
         params.ori_norm = 1;
-        
-
+%%% --- No depth, 9 orientations --- %%%        
+    case 25
+        % Default parameters:
+        params.metaparams.Descr = '1 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors';
+        params.metaparams.AxLabel = '1d, 1h, 1v bin, 9ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        % nDepthDivs = 1;
+        params.DepthDiv = [0,inf];
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
                 
 %%% --- Testing equivalence (or near equivalence) with HoN models: 
     case 101
