@@ -599,7 +599,79 @@ switch Arg(1)
             0,1,0]; % straight-ahead
         % Keep normals in screen coordinates
         params.normParams.removeComponent = [0,0,0];
-                
+%%% --- Relative depth. --- %%%
+    case 26
+
+        % 5 depth 0-1, 1 normal basis vector
+        params.metaparams.Descr = '5 depth x 1 horiz x 1 vert bin, relative depth 0-1';
+        params.metaparams.AxLabel = '5d0-1, 1h, 1v bin';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(.1),log10(1),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),inf]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+
+    case 27
+        % 10 depth 0-1, 1 normal basis vector
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin, relative depth 0-1';
+        params.metaparams.AxLabel = '10d0-1, 1h, 1v bin';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(.1),log10(1),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),inf]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+    case 28
+        % Add more depth (10), 9 normal basis vectors
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors, relative depth 0-1';
+        params.metaparams.AxLabel = '10d0-1, 1h, 1v bin, 9ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(.1),log10(1),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),inf]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        % NOTE! It is not a terribly easy problem to place equi-distant points
+        % around a sphere or half-sphere. See:
+        % http://www.math.niu.edu/~rusin/known-math/95/sphere.faq
+        % ...for potential improvements in selecting normal bin centers
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead %% NOTE! This is still fuckt: this direction in the Blender world is supposed to be -1
+        params.normParams.removeComponent = [0,0,0];
+        
 %%% --- Testing equivalence (or near equivalence) with HoN models: 
     case 101
         % 1 depth 9 normal basis vectors

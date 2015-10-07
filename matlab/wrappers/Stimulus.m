@@ -42,7 +42,7 @@ classdef Stimulus
             %           1 for 1-part stim)
             %       .n_parts = total number of parts for this whole stimulus
             %       .dbi = mlabSTRFdb instance
-            %       < Other parameters for the stimulus (e.g. orientation
+            %       * Other parameters for the stimulus (e.g. orientation
             %       of gratings, etc) may be included in Opts, too.
             %       HOWEVER, remember that floating-point numbers are a
             %       COLOSSAL pain in the ass to deal with as keys in a
@@ -213,7 +213,9 @@ classdef Stimulus
         
         function self = load(self)
             % Load stimulus matrix into memory
-            fpath = fullfile(self.path,self.fname);
+            % (Or, load multiple components of a stimulus into memory)
+            
+            % Allow for possibility of multi-component stimuli
             if strcmp(self.stim_class,'multi_component')
                 Stmp = struct;
                 fnms = fieldnames(self.S);
@@ -226,28 +228,47 @@ classdef Stimulus
                 self.S = Stmp;
                 return
             end
+            
             % load stimulus data from files
             if isempty(self.path)||isempty(self.fname)
                 error([mfilename ':PathEmpty'],'Can''t load due to empty path field!')
             end
-            if ~exist(fpath,'file')
-                error([mfilename ':BadPath'], 'Specified load path does not exist!')
-            end
-            try
-                tmp = load(fpath);
-                self.S = tmp.S;
-            catch ME %#ok<NASGU>
-                % Check ME error?
-                % Get info first? always store as "S"?
-                self.S = h5read(fpath,'/S');
-                if ndims(self.S)==2
-                    % Transpose from hf5 orientation (python/matlab
-                    % difference)
-                    disp('Transposing 2D stimulus...')
-                    self.S = self.S';
-                    disp(size(self.S))
+            fpath = fullfile(self.path,self.fname);
+            if iscell(fpath)
+                if ~strcmp(self.stim_class,'RGB')
+                    error('Not ready for loading multiple files for stim_class that is not RGB!')
                 end
-            end
+                % Stimulus is stored in multiple files; load each one
+                [im1,~,alpha] = imread(fpath{1});
+                % Preallocate stimulus size
+                self.S = zeros([size(im1),length(fpath)],'single');
+                self.S(:,:,:,1) = single(im1)/255;
+                for ifile = 2:length(fpath)
+                    [tmp,~,alpha] = imread(fpath{ifile});
+                    % Scale 1-0 for RGB images
+                    self.S(:,:,:,ifile) = single(tmp)/255;
+                end
+            else
+                % Single file; load it.
+                if ~exist(fpath,'file')
+                    error([mfilename ':BadPath'], 'Specified load path does not exist!')
+                end
+                try
+                    tmp = load(fpath);
+                    self.S = tmp.S;
+                catch ME %#ok<NASGU>
+                    % Check ME error?
+                    % Get info first? always store as "S"?
+                    self.S = h5read(fpath,'/S');
+                    if ndims(self.S)==2
+                        % Transpose from hf5 orientation (python/matlab
+                        % difference)
+                        disp('Transposing 2D stimulus...')
+                        self.S = self.S';
+                        disp(size(self.S))
+                    end
+                end
+            end            
             SzTmp = size(self.S);
             % Fill n_frames, sz;
             if ndims(self.S)>2 %#ok<*ISMAT>

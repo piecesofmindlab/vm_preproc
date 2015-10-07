@@ -881,7 +881,15 @@ switch Arg
         % Nonlinearities
         pp.phasemode = 0; % Determines how to do phase (square & sum quadrature pairs, etc)
         pp.phasemode_sfmax = NaN; % No idea
-        pp.zeromean = 1;        
+        pp.zeromean = 1;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%       Large Gabor wavelets for scene-selective areas                %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    case 60
+        0;
+        % WORKING HERE
     case 102
         % special case for preprocessing for LocalizedWhiteNoise stim
         pp = preprocWavelets_grid_GetMetaParams(2);

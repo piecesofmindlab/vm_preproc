@@ -150,6 +150,10 @@ for iS = 1:nIms
                     o = nn * params.normBinCenters';
                     Lb = sqrt(sum(nn.^2,2));
                     o = bsxfun(@rdivide,o,Lb); % Norm of params.normBinCenters should be 1
+                    if max(o(:)-1)>.0001
+                        error('The magnitude of one of your normal bin vectors crossed with a stimulus normal is > 1 - Check on your stimulus / normal vectors!')
+                    end
+                    o = min(o,1); % get rid of values barely > 1 to prevent imaginary output
                     angles = acosd(o);
                     % The following is a "soft" histogramming of normals. I.e., if a given
                     % normal falls partway between two normal bins, it is partially

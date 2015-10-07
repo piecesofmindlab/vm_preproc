@@ -386,9 +386,13 @@ classdef preprocStep
             % Cleanup
             for iP = 1:self.S(1).n_parts
                 sfile1 = fullfile(self.S(iP).path,self.S(iP).fname);
-                if exist(sfile1,'file') && any(strfind(sfile1,'TempPreprocFile'))
-                    % Get rid of temp files from previous preprocesing steps 
-                    delete(sfile1)
+                if ~iscell(sfile1)
+                    % (If self.S.fname is a cell, then for sure do NOT
+                    % delete the files)
+                    if exist(sfile1,'file') && any(strfind(sfile1,'TempPreprocFile'))
+                        % Get rid of temp files from previous preprocesing steps 
+                        delete(sfile1)
+                    end
                 end
             end
             % Outputs
@@ -401,8 +405,12 @@ classdef preprocStep
         function ids  = get_oStimulus_ids(self,S)
             % Get ids for original stimulus (oStimulus) from which this
             % FeatureSpace was computed
+            ids = {};
             if isa(S,'FeatureSpace')
-                ids = S.extras.oStimulus;
+                for ii = 1:length(S)
+                    tmp = S(ii).extras.oStimulus;
+                    ids = [ids,tmp];
+                end
                 return
             elseif isa(S,'Stimulus')
 %                 if strcmp(S(1).stim_class,'multi_component')
@@ -433,7 +441,7 @@ classdef preprocStep
 %                     end
 %                 end
 %                 ids = [ids{:}];
-                ids = get_stimulus_ids(self,S);
+                ids = get_stimulus_ids(self,S); % not self.get_stimulus_ids(self,S); % ??? 
             end
         end
         function ids  = get_stimulus_ids(self,S)
