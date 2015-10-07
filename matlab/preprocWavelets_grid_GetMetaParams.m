@@ -887,9 +887,80 @@ switch Arg
 %%%       Large Gabor wavelets for scene-selective areas                %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    case 60
+    case 61
         0;
         % WORKING HERE
+    case 71
+        % ONLY motion channels from arg 1 (Thus, the channels from 71 and 5 combine to make all channels in arg 1)
+        % smaller motion energy model
+        % STRFlab conventions, housekeeping
+        pp.class = 'preprocWavelets_grid';
+        pp.show_or_preprocess = 1; % True to preprocess; false to return gabor channels
+        pp.verbose = 1;
+        pp.gaborcachemode = 0;
+        pp.valid_w_index = NaN; % Select particular gabor channels by number
+        % Temporal frequency params
+        pp.tfdivisions = 2;
+        pp.tfmax = 2.66667; % = 4hz @ 15 fps
+        pp.tfmin = 1.33333; % = 2hz @ 15 fps
+        pp.tsize = 10;
+        pp.tf_gaussratio = 10; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 0; % NOPE.
+        pp.f_gaussratio = .5;
+        % Orientation/direction params
+        pp.dirdivisions = 8;
+        pp.local_dc = 1; % T/F. Include circular gaussians (w/ no spat. freq.)
+        pp.directionSelective = 1;
+        % Spatial extent params
+        pp.sfdivisions = 5;
+        pp.sfmax = 24; %
+        pp.sfmin = 1.5; %
+        pp.f_step_log = 1; % Applies to both SF and TF?
+        pp.std_step = 4; % Governs how closely spaced channels are; a reasonable range is 2.5-4
+        pp.sf_gaussratio = 0.6000; % 81 channels @maxsf=24; 9x9 ; 13x13 @maxsf=32
+        pp.fenv_mode = 0; % use same env for spatial & temporal gabors
+        pp.senv_max = 0.3000;
+        pp.wrap_all = 0;
+        % Handling phase
+        pp.phasemode = 0; % Determines how to do phase (square & sum quadrature pairs, etc)
+        pp.phasemode_sfmax = NaN; % No idea
+        pp.zeromean = 1;        
+    case 72
+        % ONLY motion channels from arg 2 (Thus, the channels from 72 and 6 combine to make all channels in arg 2)
+        % larger motion energy model 
+        % STRFlab conventions, housekeeping
+        pp.class = 'preprocWavelets_grid';
+        pp.show_or_preprocess = 1;
+        pp.wrap_all = 0;
+        pp.verbose = 1;
+        pp.gaborcachemode = 0;
+        pp.valid_w_index = NaN;
+        % Temporal frequency params
+        pp.tfdivisions = 2;
+        pp.tfmax = 2.66667;
+        pp.tfmin = 1.33333;
+        pp.tsize = 10;
+        pp.tf_gaussratio = 10; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 0;
+        % Orientation/direction params
+        pp.dirdivisions = 8;
+        pp.local_dc = 1; 
+        pp.directionSelective = 1;
+        % Spatial extent params
+        pp.sfdivisions = 5;
+        pp.sfmax = 32; %
+        pp.sfmin = 2; %
+        pp.f_step_log = 1; % Applies to both SF and TF?
+        pp.std_step = 3.5; % Governs how closely spaced channels are
+        pp.sf_gaussratio = 0.6000; % 81 channels @maxsf=24; 9x9 ; 13x13 @maxsf=32
+        pp.fenv_mode = 0; % (whether to use fenv_max for both senv_max and tenv_max) 
+        pp.senv_max = 0.3000;
+        % Nonlinearities
+        pp.phasemode = 0; % Determines how to do phase (square & sum quadrature pairs, etc)
+        pp.phasemode_sfmax = NaN; % No idea
+        pp.zeromean = 1;              
     case 102
         % special case for preprocessing for LocalizedWhiteNoise stim
         pp = preprocWavelets_grid_GetMetaParams(2);
