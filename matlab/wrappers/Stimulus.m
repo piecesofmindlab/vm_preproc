@@ -12,7 +12,7 @@ classdef Stimulus
         hz
         part
         n_parts
-        dbi = mlabSTRFdb;
+        dbi = [];
         extras
     end
     
@@ -41,7 +41,6 @@ classdef Stimulus
             %       .part = part number of potentially multiple parts (use
             %           1 for 1-part stim)
             %       .n_parts = total number of parts for this whole stimulus
-            %       .dbi = mlabSTRFdb instance
             %       * Other parameters for the stimulus (e.g. orientation
             %       of gratings, etc) may be included in Opts, too.
             %       HOWEVER, remember that floating-point numbers are a
