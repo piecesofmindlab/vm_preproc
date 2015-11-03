@@ -1,6 +1,5 @@
 function [Spreproc, params] = preprocGist(S,params)
-%
-% [Spreproc, params] = preprocGist(S,params)
+% Usage: [Spreproc, params] = preprocGist(S,params)
 % 
 % Preprocess image stack with gist model. Based on A. Oliva & A. Torralba's
 % LMgist code (WEB SITE), see references below

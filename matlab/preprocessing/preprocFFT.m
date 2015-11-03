@@ -1,5 +1,5 @@
-function [Spreproc, params] = preprocFFTbins(S, params)
-% Usage: [Spreproc, params] = preprocFFTbins(S, params)
+function [Spreproc, params] = preprocFFT(S, params)
+% Usage: [Spreproc, params] = preprocFFT(S, params)
 dparams.class = 'preprocFFT';
 dparams.screen_degrees = 21.32;
 dparams.angle_bins = [0;360]; % nan = no filter by angle

@@ -219,9 +219,10 @@ switch ArgNum
         params.signOpt = 'absolute'; % rectify, absolute, bin, etc.
         params.tmpPath = '/auto/k8/tempcache/';
         params.Is_Recache = false;
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%% Grid search for single radii of curvature, bin scale %%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%% Grid search for single radii of curvature, bin scale %%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
     case 101
         % r=8,b=30
