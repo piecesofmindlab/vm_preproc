@@ -94,7 +94,13 @@ if ~isempty(params.tmpPath)
         %    movefile(HashFileOld,HashFile);
         %end
         %disp(HashFile)
-        Cached{iScale} = matfile(HashFile,'writable',~CacheExists(iScale));
+        try
+            Cached{iScale} = matfile(HashFile,'writable',~CacheExists(iScale));
+        catch
+            % Problem with mat file
+            CacheExists(iScale) = false;
+            delete(HashFile);
+        end
         %params.cacheFile{iScale} = HashFile;
         if ~CacheExists(iScale)
             Cached{iScale}.K = zeros(y,x,nIms);
