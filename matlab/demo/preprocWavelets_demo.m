@@ -22,6 +22,14 @@ for iIm = length(imlist)
     im(:,:,:,iIm) = imresize(imtmp,sz);
 end
 
+%% if starting with other images (not running the above two cells)
+load ../../../5e27feec42904bdcaba4aa3ac564cdd7.mat
+im = S;
+% addpath('../')
+% addpath('../preprocessing')
+% addpath('../utils')
+% addpath('../wrappers')
+
 %% Color space preprocessing
 % For all preprocessing functions, enumerated pre-set parameter sets are
 % stored in <preprocFunctionName>_getMetaParams.m The meanings of each
@@ -60,10 +68,10 @@ zparams = preprocNormalize_GetMetaParams(3);
 
 % Context for Gabor model:
 %% make a single Gabor
-channel = 122; % Pick a random channel out of all 6,555 possible channels
-[g1,g2] = make3dgabor([128,128,10],gparams.gaborparams(channel,:));
+%channel = 122; % Pick a random channel out of all 6,555 possible channels
+%[g1,g2] = make3dgabor([128,128,10],gparams.gaborparams(channel,:));
 % The two wavelets returned will be in quadrature phase (they will have a 90º phase offset)
 %% Make ALL the Gabor filters used for a given model:
 gparams.show_or_preprocess = 0;
-[gabors,~] = preprocWavelets_grid(ones(128,128,10),gparams);
+[gabors,~] = preprocWavelets_grid(rand(96,96,30),gparams);
 % Result will be X x Y x Time x gabor channel
