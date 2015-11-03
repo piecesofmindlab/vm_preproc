@@ -64,7 +64,7 @@ zparams = preprocNormalize_GetMetaParams(3);
 % (which requires some other code). I have been meaning to clean this up a
 % little; haven't yet. 
 %S = Stimulus(im); % These can also be loaded from a database
-%[Spp,params] = preprocPipeline(S,{'preprocColorSpace',1,'preprocWavelets_grid',2,'preprocNonLinearOut',1,'preprocDownsample',1,'preprocNormalize',3});
+[Spp,params] = preprocPipeline(S,{'preprocColorSpace',1,'preprocWavelets_grid',2,'preprocNonLinearOut',1,'preprocDownsample',1,'preprocNormalize',3});
 
 % Context for Gabor model:
 %% make a single Gabor

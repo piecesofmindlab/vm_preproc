@@ -13,7 +13,7 @@ classdef FeatureSpace
         hz
         part
         n_parts
-        dbi = mlabSTRFdb;
+        dbi = [];
         extras
 
     end

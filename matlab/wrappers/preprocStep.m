@@ -462,10 +462,14 @@ classdef preprocStep
             else
                 ids = cell(length(S),1);
                 for iS = 1:length(S)
-                    tmp = S(iS).get_docdict();
-                    xID = [self.dbi.prefix '_id'];
-                    if isfield(tmp,xID)
-                        ids{iS} = {tmp.(xID)};
+                    if ~isempty(self.dbi) && ~isnan(self.dbi)
+                        tmp = S(iS).get_docdict();
+                        xID = [self.dbi.prefix '_id'];
+                        if isfield(tmp,xID)
+                            ids{iS} = {tmp.(xID)};
+                        else
+                            ids{iS} = {};
+                        end
                     else
                         ids{iS} = {};
                     end
