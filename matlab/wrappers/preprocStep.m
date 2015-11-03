@@ -301,7 +301,7 @@ classdef preprocStep
                     % individual parts (at this stage) to the database 
                     Spreproc(iPart) = FeatureSpace(SppTmp,docdict_part,[]);
                     Spreproc(iPart).path = '/tmp/';
-                    Spreproc(iPart).fname = ['TempPreprocFile_' mlabSTRFdb.getUUID() '.mat'];
+                    Spreproc(iPart).fname = ['TempPreprocFile_' getUUID() '.mat'];
                     fprintf('Saving TEMP file of FeatureSpace w/ steps:\n')
                     disp(Spreproc(iPart).ppseq)
                     fprintf('at: %s\n',fullfile(Spreproc(iPart).path,Spreproc(iPart).fname))
