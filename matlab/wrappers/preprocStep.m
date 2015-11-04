@@ -304,6 +304,11 @@ classdef preprocStep
                         Spreproc(iPart).fname = [Spreproc(iPart).extras.(ID) '.mat'];
                     end
                 else
+                    % Here, could be 
+                    %   (1) is_concat, is saving permanently
+                    %   (2) is_concat, not saving permanently
+                    %   (3) not concat, not saving permanently
+                    % For all of these: 
                     % Create temp file path with no dbi entry if not saving
                     % individual parts (at this stage) to the database 
                     Spreproc(iPart) = FeatureSpace(SppTmp,docdict_part,[]);
@@ -324,6 +329,7 @@ classdef preprocStep
             %%%        Re-concatenate all stim parts if desired         %%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             if is_concat
+                Spp_temp = Spreproc; % Retain for cleanup below
                 % re-load Spreproc parts
                 ND = length(Spreproc(1).sz);
                 nFrCum = [0,cumsum([Spreproc(1:end-1).n_frames])];
@@ -392,17 +398,21 @@ classdef preprocStep
             end
             % Cleanup
             for iP = 1:self.S(1).n_parts
-                if ~isempty(self.S(iP).path) && ~isempty(self.S(iP).fname)
+                if (~isempty(self.S(iP).path) && ~isempty(self.S(iP).fname)) 
+                    % (1) prior stage has S.(part).path value
                     sfile1 = fullfile(self.S(iP).path,self.S(iP).fname);
-                    if ~iscell(sfile1)
-                        % (If self.S.fname is a cell, then for sure do NOT
-                        % delete the files)
-                        if exist(sfile1,'file') && any(strfind(sfile1,'TempPreprocFile'))
-                            % Get rid of temp files from previous preprocesing steps 
-                            delete(sfile1)
-                        end
-                    end
+                elseif is_concat
+                    % (2) some value of Spp_temp was created; delete the path
+                    sfile1 = fullfile(Spp_temp(iP).path,Spp_temp(iP).fname);
                 end
+                if ~iscell(sfile1)
+                    % (If self.S.fname is a cell, then for sure do NOT
+                    % delete the files)
+                    if exist(sfile1,'file') && any(strfind(sfile1,'TempPreprocFile'))
+                        % Get rid of temp files from previous preprocesing steps 
+                        delete(sfile1)
+                    end
+                end                
             end
             % Outputs
             varargout{1} = Spreproc;
