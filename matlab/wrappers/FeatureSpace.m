@@ -30,9 +30,12 @@ classdef FeatureSpace
             %       dimension is assumed to be time; if 2D, 1st dim is time
             % Opts : params struct array for preprocessing (up to this
             %       point)
-            % dbi : (optional) - defaults to standard call to mlabSTRFdb,
-            %       i.e., if you DON'T want a database, put a blank ( []  )
-            %       variable into "dbi"
+            % dbi : (optional) - defaults to []; if you want to store /
+            %       retrieve the FeatureSpace from a database, you will
+            %       need docdb module (http://github.com/gallantlab/docdb/)
+            %       installed and working with matlab. dbi is a databsae
+            %       interface object, created e.g. by 
+            %       mlabSTRFdb(dbhost,dbname)
             
             % Inputs
             % Optionally delay loading S (stimulus matrix)
@@ -74,12 +77,11 @@ classdef FeatureSpace
             if AllParts
                 % Remove all unique identifiers for separate parts
                 if isempty(self(1).dbi)
-                    dbTmp = mlabSTRFdb('dummy','instance');
-                    toRm = [{'path',[dbTmp.prefix '_rev'],[dbTmp.prefix '_id'],'part'},toRm];
+                    prefix = 'x0x5F';
                 else
-                    % Allow for potentially different prefix in self.dbi
-                    toRm = [{'path',[self.dbi.prefix '_rev'],[self.dbi.prefix '_id'],'part'},toRm];
+                    prefix = self.dbi.prefix;
                 end
+                toRm = [{'path',[prefix '_rev'],[prefix '_id'],'part'},toRm];
             end
             qStr = struct;
             for ii = 1:length(props)
@@ -214,15 +216,14 @@ classdef FeatureSpace
             end
             % Save stimulus to database (or wherever)
             if isempty(self.dbi)
-                tmpdb = mlabSTRFdb;
-                xID = [tmpdb.prefix '_id'];
+                prefix = 'x0x5F';
             else
-                xID = [self.dbi.prefix '_id'];
+                prefix = self.dbi.prefix;
             end
+            xID = [prefix '_id'];
             if ~isfield(SppChk,xID)
-                SppChk.(xID) = mlabSTRFdb.getUUID();
+                SppChk.(xID) = getUUID();
             end
-
             if ~isfield(SppChk,'path') || isempty(SppChk.path)
                 SppChk.path = sDir;
             end
