@@ -111,7 +111,10 @@ classdef preprocStep
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%%   Query database for cached versions of feature space   %%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            if ~isempty(self.dbi)
+            if isempty(self.dbi)
+                prefix = 'x0x5F';
+            else
+                prefix = self.dbi.prefix;
                 % Check the database for previous (cached) run of this preprocessing sequence
                 qStr.type = 'FeatureSpace';
                 qStr.ppseq = self.params.ppseq;
@@ -211,6 +214,10 @@ classdef preprocStep
             else
                 is_concat = false;
             end
+            % Override is_concat if there is only one part
+            if self.S(1).n_parts==1
+                is_concat = true;
+            end
             for iPart = 1:self.S(1).n_parts
                 % Load stimulus matrix, if necessary
                 if iscell(self.S(iPart).S) || isstruct(self.S(iPart).S) || isempty(self.S(iPart).S)
@@ -233,10 +240,10 @@ classdef preprocStep
                     % mStim.trnval = 'trn';
                     % NEW:
                     q = self.S.get_docdict();
-                    v_ostim = self.dbi.query([self.dbi.prefix '_id'],q.oStimulus); %q.oStimulus{1}?
+                    v_ostim = self.dbi.query([prefix '_id'],q.oStimulus); %q.oStimulus{1}?
                     trnq = rmfield(v_ostim,'n_frames','n_parts');
                     t_ostim = self.dbi.query(trnq);
-                    t_ostim_ids = {t_ostim.([self.dbi.prefix '_id'])};
+                    t_ostim_ids = {t_ostim.([prefix '_id'])};
                     % OLD: q = struct('type','FeatureSpace','mStim',mStim,'ppseq',{self.params.ppseq},'trnval','trn');
                     % FUCK there is an assumption here that this will be
                     % sufficiently far along that there will be an
@@ -290,13 +297,18 @@ classdef preprocStep
                     Spreproc(iPart) = FeatureSpace(SppTmp,docdict_part,self.dbi);
                     fprintf('Saving FeatureSpace w/ preproc steps:\n')
                     disp(Spreproc(iPart).ppseq)
-                    ID = [self.dbi.prefix '_id'];
+                    ID = [prefix '_id'];
                     if ~isfield(Spreproc(iPart).extras,ID)
                         Spreproc(iPart).extras.(ID) = self.dbi.getUUID();
                         Spreproc(iPart).path = self.sDir;
                         Spreproc(iPart).fname = [Spreproc(iPart).extras.(ID) '.mat'];
                     end
                 else
+                    % Here, could be 
+                    %   (1) is_concat, is saving permanently
+                    %   (2) is_concat, not saving permanently
+                    %   (3) not concat, not saving permanently
+                    % For all of these: 
                     % Create temp file path with no dbi entry if not saving
                     % individual parts (at this stage) to the database 
                     Spreproc(iPart) = FeatureSpace(SppTmp,docdict_part,[]);
@@ -317,6 +329,7 @@ classdef preprocStep
             %%%        Re-concatenate all stim parts if desired         %%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             if is_concat
+                Spp_temp = Spreproc; % Retain for cleanup below
                 % re-load Spreproc parts
                 ND = length(Spreproc(1).sz);
                 nFrCum = [0,cumsum([Spreproc(1:end-1).n_frames])];
@@ -374,7 +387,7 @@ classdef preprocStep
                 if isfield(ppTmp,'dbCache') && ppTmp.dbCache
                     fprintf('Saving FeatureSpace w/ preprocessing steps:\n')
                     disp(Spreproc.ppseq)
-                    ID = [self.dbi.prefix '_id'];
+                    ID = [prefix '_id'];
                     if ~isfield(Spreproc.extras,ID)
                         Spreproc.extras.(ID) = self.dbi.getPath('','');
                         Spreproc.path = self.sDir;
@@ -385,7 +398,13 @@ classdef preprocStep
             end
             % Cleanup
             for iP = 1:self.S(1).n_parts
-                sfile1 = fullfile(self.S(iP).path,self.S(iP).fname);
+                if (~isempty(self.S(iP).path) && ~isempty(self.S(iP).fname)) 
+                    % (1) prior stage has S.(part).path value
+                    sfile1 = fullfile(self.S(iP).path,self.S(iP).fname);
+                elseif is_concat
+                    % (2) some value of Spp_temp was created; delete the path
+                    sfile1 = fullfile(Spp_temp(iP).path,Spp_temp(iP).fname);
+                end
                 if ~iscell(sfile1)
                     % (If self.S.fname is a cell, then for sure do NOT
                     % delete the files)
@@ -393,7 +412,7 @@ classdef preprocStep
                         % Get rid of temp files from previous preprocesing steps 
                         delete(sfile1)
                     end
-                end
+                end                
             end
             % Outputs
             varargout{1} = Spreproc;
@@ -413,40 +432,17 @@ classdef preprocStep
                 end
                 return
             elseif isa(S,'Stimulus')
-%                 if strcmp(S(1).stim_class,'multi_component')
-%                     fnms = fieldnames(S(1).S);
-%                     for ifn = 1:length(fnms)
-%                         ids.(fnms{ifn}) = {};
-%                     end
-%                     for iS = 1:length(S)
-%                         for ifn = 1:length(fnms)
-%                             tmp = self.get_oStimulus_ids(S(iS).S.(fnms{ifn}));
-%                             ids.(fnms{ifn}) = [ids.(fnms{ifn}),tmp];
-%                         end
-%                     end
-%                     ids.stim_class = 'multi_component';
-%                 end
-%                 ids = cell(length(S),1);
-%                 for iS = 1:length(S)
-%                     tmp = S(iS).get_docdict();
-%                     if isfield(tmp,'oStimulus')
-%                         ids{iS} = tmp.oStimulus; % need index for cell array?
-%                     else
-%                         xID = [self.dbi.prefix '_id'];
-%                         if isfield(tmp,xID)
-%                             ids{iS} = {tmp.(xID)};
-%                         else
-%                             ids{iS} = {};
-%                         end
-%                     end
-%                 end
-%                 ids = [ids{:}];
                 ids = get_stimulus_ids(self,S); % not self.get_stimulus_ids(self,S); % ??? 
             end
         end
         function ids  = get_stimulus_ids(self,S)
             % Get Stimulus (or FeatureSpace) from which this FeatureSpace
             % was computed
+            if isempty(self.dbi)
+                prefix = 'x0x5F';
+            else
+                prefix = self.dbi.prefix;
+            end
             if isprop(S(1),'stim_class') && strcmp(S(1).stim_class,'multi_component')
                 fnms = fieldnames(S(1).S);
                 for ifn = 1:length(fnms)
@@ -462,14 +458,10 @@ classdef preprocStep
             else
                 ids = cell(length(S),1);
                 for iS = 1:length(S)
-                    if ~isempty(self.dbi) && ~isnan(self.dbi)
-                        tmp = S(iS).get_docdict();
-                        xID = [self.dbi.prefix '_id'];
-                        if isfield(tmp,xID)
-                            ids{iS} = {tmp.(xID)};
-                        else
-                            ids{iS} = {};
-                        end
+                    tmp = S(iS).get_docdict();
+                    xID = [prefix '_id'];
+                    if isfield(tmp,xID)
+                        ids{iS} = {tmp.(xID)};
                     else
                         ids{iS} = {};
                     end
