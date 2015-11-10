@@ -968,6 +968,80 @@ switch Arg
     case 106
         pp = preprocWavelets_grid_GetMetaParams(6);
         pp.zeromean_value = 60.3156;
+    case 201
+        % larger motion energy model for multi-session fMRI data sets
+        % /ephys? : NO TEMPORAL CHANNELS, w/ pyr, w/ ori
+        % STRFlab conventions, housekeeping
+        % BASED ON preset #6; variations by AM to explore parameter space
+        pp.class = 'preprocWavelets_grid';
+        pp.show_or_preprocess = 0;
+        pp.wrap_all = 0;
+        pp.verbose = 1;
+        pp.gaborcachemode = 0;
+        pp.valid_w_index = NaN;
+        % Temporal frequency params
+        pp.tfdivisions = 1;
+        pp.tfmax = 0;
+        pp.tfmin = 0;
+        pp.tsize = 1;
+        pp.tf_gaussratio = 1; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 1;
+        % Orientation/direction params
+        pp.dirdivisions = 8;
+        pp.local_dc = 1; 
+        pp.directionSelective = 1;
+        % Spatial extent params
+        pp.sfdivisions = 5;
+        pp.sfmax = 32; %
+        pp.sfmin = 2; %
+        pp.f_step_log = 1; % Applies to both SF and TF?
+        pp.std_step = 3.5; % Governs how closely spaced channels are
+        pp.sf_gaussratio = 0.6000; % 81 channels @maxsf=24; 9x9 ; 13x13 @maxsf=32
+        pp.fenv_mode = 0; % (whether to use fenv_max for both senv_max and tenv_max) 
+        pp.senv_max = 0.3000;
+        pp.aspect_ratio = 2;
+        % Nonlinearities
+        pp.phasemode = 0; % Determines how to do phase (square & sum quadrature pairs, etc)
+        pp.phasemode_sfmax = NaN; % No idea
+        pp.zeromean = 1;
+    case 202
+        % larger motion energy model for multi-session fMRI data sets
+        % /ephys? : NO TEMPORAL CHANNELS, w/ pyr, w/ ori
+        % STRFlab conventions, housekeeping
+        % BASED ON preset #6; variations by AM to explore parameter space
+        pp.class = 'preprocWavelets_grid';
+        pp.show_or_preprocess = 0;
+        pp.wrap_all = 0;
+        pp.verbose = 1;
+        pp.gaborcachemode = 0;
+        pp.valid_w_index = NaN;
+        % Temporal frequency params
+        pp.tfdivisions = 1;
+        pp.tfmax = 0;
+        pp.tfmin = 0;
+        pp.tsize = 1;
+        pp.tf_gaussratio = 1; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 1;
+        % Orientation/direction params
+        pp.dirdivisions = 8;
+        pp.local_dc = 1; 
+        pp.directionSelective = 1;
+        % Spatial extent params
+        pp.sfdivisions = 5;
+        pp.sfmax = 32; %
+        pp.sfmin = 2; %
+        pp.f_step_log = 1; % Applies to both SF and TF?
+        pp.std_step = 4; % Governs how closely spaced channels are
+        pp.sf_gaussratio = 0.6000; % 81 channels @maxsf=24; 9x9 ; 13x13 @maxsf=32
+        pp.fenv_mode = 0; % (whether to use fenv_max for both senv_max and tenv_max) 
+        pp.senv_max = 0.3000;
+        pp.aspect_ratio = 3;
+        % Nonlinearities
+        pp.phasemode = 0; % Determines how to do phase (square & sum quadrature pairs, etc)
+        pp.phasemode_sfmax = NaN; % No idea
+        pp.zeromean = 1;
     case 1000
         % model 1 w/ NO TEMPORAL CHANNELS
         % STRFlab conventions, housekeeping

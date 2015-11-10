@@ -89,6 +89,10 @@ grat90_s = cos( (ixs-cx)*fx + (iys-cy)*fy + phase);
 gs_slice = g_slice.*grat_s;
 gc_slice = g_slice.*grat90_s;
 
+if elong ~= 1
+    elong;
+end
+
 env_t = exp(-(dt-0.5).^2/(2*tenv^2));
 if imag(tf)
   gs_t = sin( (dt-0.5)*ft ) + sin( (dt-0.5)*(-ft) );
@@ -113,13 +117,16 @@ gabor90 = gc_slice;
 
 function g_slice = elonggauss(ixs, iys, cx, cy, senv, elong, dir)
 
+theta = dir*pi/180;
+
 sxy = [1 elong];
+%sxy = [1+cos(theta)^2 1+sin(theta)^2]
+%sxy = [sqrt(elong)*(1+cos(theta)^2) sqrt(elong)*(1+sin(theta)^2)];
+%sxy = [1 1];
 sxy = sxy/norm(sxy);
 
 sigma_x = sxy(1);
 sigma_y = sxy(2);
-
-theta = dir*pi/180;
 
 a = cos(theta)^2/2/sigma_x^2 + sin(theta)^2/2/sigma_y^2;
 b = -sin(2*theta)/4/sigma_x^2 + sin(2*theta)/4/sigma_y^2 ;

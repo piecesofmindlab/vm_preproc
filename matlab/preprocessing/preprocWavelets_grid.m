@@ -168,7 +168,13 @@ start_t = cputime;
 % Stimulus check
 stimxytsize = size(S);
 % Stimulus aspect ratio; always X/Y
-aspect_ratio = stimxytsize(2)/stimxytsize(1);
+if ~isfield(params,'aspect_ratio')
+    sprintf('No aspect ratio specified, defaulting to image aspect ratio');
+    aspect_ratio = stimxytsize(2)/stimxytsize(1);
+else
+    aspect_ratio = params.aspect_ratio;
+end
+% aspect_ratio = 2;
 if length(stimxytsize) == 2
     stimxytsize = [stimxytsize 1]; % make sure 3 dimensions
 elseif length(stimxytsize)==4
@@ -237,7 +243,7 @@ end
 % Make a list of gabor parameters
 if ~isfield(params,'gaborparams') || params.phasemode == 5 || ...
         params.phasemode == 7
-    if verbose, fprintf('Making a list of gabor parameters... '); end
+    if verbose, fprintf('Making a list of gabor parameters... \n'); end
     % Added aspect ratio as necessary influence on Gabor parameters
     [gparams] = getGaborParameters(params,aspect_ratio);
 else
@@ -524,14 +530,23 @@ for ti=1:params.tfdivisions
                 numsps2 = numsps2 + 1;
             end
             centers = senv*params.std_step*(-numsps2:numsps2) + 0.5;
-            [cx, cy] = meshgrid(centers, centers);    
+            [cx, cy] = meshgrid(centers, centers);
+            fprintf('AR=1, sf=%.2f, nx=%d, ny=%d\n',sf,length(cx),length(cy));
         else
             % aspect_ratio is x/y. Thus ar*x = true x OR y/ar = true y
             % Compute 
             g_sz_x = senv*params.std_step;
             n_gabors_x = floor((1-g_sz_x)/(g_sz_x)/2);
             n_gabors_x = max([n_gabors_x,0]);
-            g_sz_y = senv*params.std_step*aspect_ratio;
+            % THIS RIGHT HERE. this makes the aspect ratio actually y:x,
+            % and applies the aspect ratio only in the y direction.
+            % poss: treat size as 1 (or rather, aspect ratio=1) -- this
+            % would recover the same centers as AR=1. then make elongated
+            % gabor's using the AR and direction, so that elongation is in
+            % the direction. Center one such at each center; they'll
+            % overlap and overflow (in which case truncate), then look...
+            % g_sz_y = senv*params.std_step*aspect_ratio;
+            g_sz_y = senv*params.std_step;
             n_gabors_y = floor((1-g_sz_y)/(g_sz_y)/2);
             n_gabors_y = max([n_gabors_y,0]);
             %REPLACED:
@@ -542,8 +557,8 @@ for ti=1:params.tfdivisions
                 error('I don''t know what to do with wrap_all parameter yet w/ asymmetrical images...')
                 %numsps2 = numsps2 + 1;
             end
-            centers_x = g_sz_x*(-n_gabors_x:n_gabors_x) + 0.5;
-            centers_y = g_sz_y*(-n_gabors_y:n_gabors_y) + 0.5;
+            centers_x = g_sz_x*(-n_gabors_x:n_gabors_x) + 0.5 ;
+            centers_y = g_sz_y*(-n_gabors_y:n_gabors_y) + 0.5 ;
             [cx, cy] = meshgrid(centers_x, centers_y);
             % Elongate gabors if differential sampling in x and y does not
             % make the gabors circular
@@ -553,6 +568,7 @@ for ti=1:params.tfdivisions
             % make3dgabor_frames.
             sampling_aspect_ratio = length(centers_x)/length(centers_y);
             elong = aspect_ratio / sampling_aspect_ratio;
+            fprintf('AR=%.2f, sf=%.2f, g_sz_x=%.2f, nx=%d, g_sz_y=%.2f, ny=%d\n',aspect_ratio,sf,g_sz_x,length(cx),g_sz_y,length(cy));
             %keyboard;
         end        
         thisnumdirs = length(dir_array);
