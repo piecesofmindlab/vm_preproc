@@ -974,7 +974,7 @@ switch Arg
         % STRFlab conventions, housekeeping
         % BASED ON preset #6; variations by AM to explore parameter space
         pp.class = 'preprocWavelets_grid';
-        pp.show_or_preprocess = 0;
+        pp.show_or_preprocess = 1;
         pp.wrap_all = 0;
         pp.verbose = 1;
         pp.gaborcachemode = 0;
@@ -1011,7 +1011,7 @@ switch Arg
         % STRFlab conventions, housekeeping
         % BASED ON preset #6; variations by AM to explore parameter space
         pp.class = 'preprocWavelets_grid';
-        pp.show_or_preprocess = 0;
+        pp.show_or_preprocess = 1;
         pp.wrap_all = 0;
         pp.verbose = 1;
         pp.gaborcachemode = 0;

@@ -46,14 +46,9 @@ gwparams.show_or_preprocess = 0; % generate raw gabors, don't preprocess stims
 [Spp,gwparams] = preprocWavelets_grid(rand(96,96,30),gwparams);
 
 gwparams2 = preprocWavelets_grid_GetMetaParams(201);
-%gwparams2.show_or_preprocess = 0; % generate raw gabors, don't preprocess stims
-%gwparams2.aspect_ratio = 2;
 [Spp2,gwparams2] = preprocWavelets_grid(rand(96,96,30),gwparams2);
 
 gwparams3 = preprocWavelets_grid_GetMetaParams(202);
-%gwparams3.show_or_preprocess = 0; % generate raw gabors, don't preprocess stims
-%gwparams3.aspect_ratio = 3;
-%gwparams3.std_step = 4 ;
 [Spp3,gwparams3] = preprocWavelets_grid(rand(96,96,30),gwparams3);
 
 showGabors({Spp, Spp2, Spp3},{gwparams,gwparams2,gwparams3})
