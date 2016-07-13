@@ -52,7 +52,7 @@ end
 nIms = length(fList);
 % Preallocate size of output matrix
 switch lower(Opts.Type)
-    case {'z0-1','zabs','bw'}
+    case {'z0-1','zabs','bw', 'zexp_med_0-1'}
         S = zeros(Opts.ImSz(1),Opts.ImSz(2),nIms,'single');
     case {'lab','rgb','normals'}
         S = zeros(Opts.ImSz(1),Opts.ImSz(2),3,nIms,'single');
@@ -61,10 +61,14 @@ end
 for iIm = 1:nIms
     progressdot(iIm,50,1000,nIms);
     switch lower(Opts.Type)
-        case 'z0-1'
+        case 'zexp_med_0-1'
             params.type = 'exp_med_0-1'; % default as of 2012.04.13
             params.ImSz = Opts.ImSz;
             Im = exr2zDepth(fList{iIm},params);
+        case 'z0-1'
+            params.type = '0-1'; % default as of 2012.04.13
+            params.ImSz = Opts.ImSz;
+            Im = exr2zDepth(fList{iIm},params);            
         case 'zabs'
             params.ImSz = Opts.ImSz;
             params.type = 'realdepth'; % default as of 2012.11.27
@@ -137,7 +141,7 @@ for iIm = 1:nIms
         Im = (Im-mean(Im(:))) ./ std(Im(:));
     end
     switch lower(Opts.Type)
-        case {'bw','z0-1','zabs'}
+        case {'bw','z0-1','zabs', 'z01', 'zexp_med_0-1'}
             S(:,:,iIm) = Im;
         case {'rgb','lab','normals'}
             S(:,:,:,iIm) = Im;

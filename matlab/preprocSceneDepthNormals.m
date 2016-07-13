@@ -44,6 +44,7 @@ pDefault.VertDiv = linspace(0,1,nVertDivs+1);
 pDefault.VertDiv(end) = inf;
 pDefault.pixel_norm = false; % normalize all channels by the fraction of the image they occupy
 pDefault.ori_norm = 2; % set to 2 for legacy code; 1 is actually preferred. Will change this default later.
+pDefault.sky_channel = false; % If true, include a separate channel for sky (all depth values above max depthdiv)
 % The following value for pDefault.DepthDivs comes out to:
 % (0,1.0000, 3.1623, 10.0000, 31.6228,inf), which is a reasonable division of space
 % Note that the depth divisions will depend on the depth input. If absolute
@@ -120,7 +121,14 @@ if any(params.normParams.removeComponent)
 end
 % Get number of images
 [x,y,nIms] = size(S.(zVar));
-nDims = (length(params.HorizDiv)-1)*(length(params.VertDiv)-1)*(length(params.DepthDiv)-1)*size(params.normBinCenters,1);
+nV = (length(params.VertDiv)-1);
+nH = (length(params.HorizDiv)-1);
+nTiles = nV*nH;
+nDepths = length(params.DepthDiv)-1;
+nDims = nTiles*nDepths*params.nNormBins;
+if params.sky_channel
+    nDims = nDims + nTiles;
+end
 Spreproc = nan(nIms,nDims);
 for iS = 1:nIms
     if nIms>200
@@ -136,11 +144,11 @@ for iS = 1:nIms
     nr = reshape(n,H*W,nd);
     [xx,yy] = meshgrid(linspace(0,1,W),linspace(0,1,H));
     idx = 1:params.nNormBins;
-    for iD = 1:length(params.DepthDiv)-1
+    for iD = 1:nDepths
         dIdx = z>=params.DepthDiv(iD) & z<params.DepthDiv(iD+1);
-        for iH = 1:length(params.HorizDiv)-1
+        for iH = 1:nH
             hIdx = xx>=params.HorizDiv(iH) & xx<params.HorizDiv(iH+1);
-            for iV = 1:length(params.VertDiv)-1
+            for iV = 1:nV
                 vIdx = yy>=params.VertDiv(iV) & yy<params.VertDiv(iV+1);
                 tileDepthCount = mean(dIdx(:) & hIdx(:) & vIdx(:));
                 if params.nNormBins>1
@@ -186,8 +194,25 @@ for iS = 1:nIms
             end
         end
     end
-
+    % Do sky channel(s) after last depth channel, add (n tiles) sky channels
+    if params.sky_channel && max(params.DepthDiv) < inf
+        dSky = z >= params.DepthDiv(end);
+        skyidx = (nDims-nTiles+1):nDims;
+        tmp = zeros(nV, nH);
+        for iH = 1:length(params.HorizDiv)-1
+            hIdx = xx>=params.HorizDiv(iH) & xx<params.HorizDiv(iH+1);
+            for iV = 1:length(params.VertDiv)-1
+                vIdx = yy>=params.VertDiv(iV) & yy<params.VertDiv(iV+1);
+                tmp(iV, iH) = mean(dSky(:) & hIdx(:) & vIdx(:));
+            end
+        end
+        Spreproc(iS, skyidx) = tmp(:);
+    end
 end
+
+
+
+% Cleanup
 Spreproc(isnan(Spreproc)) = 0;
 clear S;
 % All done!
