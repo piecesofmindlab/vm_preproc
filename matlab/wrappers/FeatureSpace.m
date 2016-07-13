@@ -142,8 +142,16 @@ classdef FeatureSpace
                 tmp = load(fpath);
                 self.S = tmp.Spreproc;
             catch ME
+                disp('matfile load failed; trying to load with h5read.')
                 % Get info first? always store as "S"?
+                %try
                 self.S = h5read(fpath,'/Spreproc');
+                %catch
+                %    disp('WTF. Should be no errors for Spreproc.')
+                %    keyboard
+                %    disp('This try/catch loop for variables named either S or Spreproc is hacky as shit. Please fix me.')
+                %    self.S = h5read(fpath,'/S');
+                %end
             end
             sz = size(self.S);
             % Fill n_frames, sz;
@@ -177,7 +185,14 @@ classdef FeatureSpace
             if ~isempty(self.dbi)
                 % Check for preprocessed stimulus in database
                 % (this will OVERWRITE previous versions)
-                cacheF = self.dbi.query(SppChk);
+                to_kill = {'last_updated','date_run'};
+                SppChk2 = SppChk;
+                for ik = 1:length(to_kill);
+                    if isfield(SppChk,to_kill{ik})
+                        SppChk2 = rmfield(SppChk2,to_kill{ik});
+                    end
+                end
+                cacheF = self.dbi.query(SppChk2);
                 if length(cacheF)==1
                     % Stimulus found; keep _id and _rev
                     SppChk.([self.dbi.prefix,'_id']) = cacheF.([self.dbi.prefix,'_id']);

@@ -545,8 +545,8 @@ for ti=1:params.tfdivisions
             % gabor's using the AR and direction, so that elongation is in
             % the direction. Center one such at each center; they'll
             % overlap and overflow (in which case truncate), then look...
-            % g_sz_y = senv*params.std_step*aspect_ratio;
-            g_sz_y = senv*params.std_step;
+            g_sz_y = senv*params.std_step*aspect_ratio;
+            %g_sz_y = senv*params.std_step;
             n_gabors_y = floor((1-g_sz_y)/(g_sz_y)/2);
             n_gabors_y = max([n_gabors_y,0]);
             %REPLACED:

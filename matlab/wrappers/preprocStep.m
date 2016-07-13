@@ -56,6 +56,8 @@ classdef preprocStep
             end
             if exist('tmpDir','var') && ~isempty(tmpDir)
                 self.tmpDir = tmpDir;
+            else
+                self.tmpDir = '/tmp/';
             end
         end
         
@@ -137,6 +139,25 @@ classdef preprocStep
                 disp('Searching for completed preprocessing of:')
                 disp(qStr.ppseq)
                 docdict_check = self.dbi.query(qStr);
+                if isempty(docdict_check)
+                    if length(qStr.oStimulus)>1
+                        disp('(*thoroughly* searching)')
+                        oStim = qStr.oStimulus;
+                        tmpdd = cell(length(oStim),1);
+                        for iostim = 1:length(oStim)
+                            qStr.oStimulus = oStim(iostim);
+                            tmpdd{iostim} = self.dbi.query(qStr);
+                        end
+                        try
+                            docdict_check = [tmpdd{:}];
+                        catch
+                            % This may need further checks... though the
+                            % check below for the correct number of parts
+                            % *should* do it...
+                            error('Stimuli with different parameters returned from dbi query! please check your stimulus encoding and try again!')
+                        end
+                    end
+                end
                 if ~isempty(docdict_check)
                     % Preprocessing has been run on this stimulus with these parameters
                     if iscell(docdict_check)
@@ -312,7 +333,7 @@ classdef preprocStep
                     % Create temp file path with no dbi entry if not saving
                     % individual parts (at this stage) to the database 
                     Spreproc(iPart) = FeatureSpace(SppTmp,docdict_part,[]);
-                    Spreproc(iPart).path = '/tmp/';
+                    Spreproc(iPart).path = self.tmpDir;
                     Spreproc(iPart).fname = ['TempPreprocFile_' getUUID() '.mat'];
                     fprintf('Saving TEMP file of FeatureSpace w/ steps:\n')
                     disp(Spreproc(iPart).ppseq)
@@ -400,19 +421,28 @@ classdef preprocStep
             for iP = 1:self.S(1).n_parts
                 if (~isempty(self.S(iP).path) && ~isempty(self.S(iP).fname)) 
                     % (1) prior stage has S.(part).path value
-                    sfile1 = fullfile(self.S(iP).path,self.S(iP).fname);
-                elseif is_concat
-                    % (2) some value of Spp_temp was created; delete the path
-                    sfile1 = fullfile(Spp_temp(iP).path,Spp_temp(iP).fname);
+                    dfiles1 = {fullfile(self.S(iP).path,self.S(iP).fname)};
+                else
+                    dfiles1 = {};
                 end
-                if ~iscell(sfile1)
-                    % (If self.S.fname is a cell, then for sure do NOT
-                    % delete the files)
-                    if exist(sfile1,'file') && any(strfind(sfile1,'TempPreprocFile'))
-                        % Get rid of temp files from previous preprocesing steps 
-                        delete(sfile1)
+                if is_concat
+                    % (2) some value of Spp_temp was created; delete the path
+                    dfiles2 = {fullfile(Spp_temp(iP).path,Spp_temp(iP).fname)};
+                else
+                    dfiles2 = {};
+                end
+                dfiles = [dfiles1,dfiles2];
+                for idel = 1:length(dfiles)
+                    dfile = dfiles{idel};
+                    if ~iscell(dfile)
+                        % (If self.S.fname is a cell, then for sure do NOT
+                        % delete the files)
+                        if exist(dfile,'file') && any(strfind(dfile,'TempPreprocFile'))
+                            % Get rid of temp files from previous preprocesing steps 
+                            delete(dfile)
+                        end
                     end
-                end                
+                end
             end
             % Outputs
             varargout{1} = Spreproc;
@@ -455,6 +485,7 @@ classdef preprocStep
                     end
                 end
                 ids.stim_class = 'multi_component';
+                ids = {ids};
             else
                 ids = cell(length(S),1);
                 for iS = 1:length(S)

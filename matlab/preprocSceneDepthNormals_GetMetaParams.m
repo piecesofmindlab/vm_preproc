@@ -671,9 +671,570 @@ switch Arg(1)
             -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
             0,1,0]; % straight-ahead %% NOTE! This is still fuckt: this direction in the Blender world is supposed to be -1
         params.normParams.removeComponent = [0,0,0];
+%%% --- More screen subdivisions (5x5)
+    case 29
+        % 5 depth 0-100, 1 normal basis vector, 5x5 screen tiles
+        params.metaparams.Descr = '5 depth x 5 horiz x 5 vert bin';
+        params.metaparams.AxLabel = '5d0-100, 5h, 5v bin';
+        nHorizDivs = 5;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 5;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),inf]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.ori_norm = 1;
         
+    case 30
+        % 10 depth 0-100, 1 normal basis vector, 5x5 screen tiles
+        params.metaparams.Descr = '10 depth x 5 horiz x 5 vert bin';
+        params.metaparams.AxLabel = '10d0-100, 5h, 5v bin';
+        nHorizDivs = 5;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 5;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = true;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),inf]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.ori_norm = 1;
+        
+%%% --- Args 1-7, With sky channel --- %%%
+    case 41
+        % Arg 1, w/ sky, abs depth
+        % Default parameters:
+        params.metaparams.Descr = '1 depth x 1 horiz x 1 vert bin, 5 Screen basis vectors, sky';
+        params.metaparams.AxLabel = '1d, 1h, 1v bin, 5ScNorms, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 1;
+        params.DepthDiv = [0,999];
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+    case 42
+        % Arg 25, with sky
+        % Default parameters:
+        params.metaparams.Descr = '1 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors, sky';
+        params.metaparams.AxLabel = '1d, 1h, 1v bin, 9ScNorms, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        % nDepthDivs = 1;
+        params.DepthDiv = [0,999];
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+    case 43
+        % Arg2 + sky, abs depth
+        params.metaparams.Descr = '5 depth x 1 horiz x 1 vert bin, 5 Screen basis vectors, sky';
+        params.metaparams.AxLabel = '5d0-100, 1h, 1v bin, 5ScNorms, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+    case 44
+        % Arg 4, w/ sky (abs depth)
+        % Add more normal basis vectors + 0-100 depth
+        params.metaparams.Descr = '5 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors, sky';
+        params.metaparams.AxLabel = '5d0-100, 1h, 1v bin, 9ScNorms, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1), 999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+    case 45
+        % Arg 6, w/ sky (abs depth)
+        % Add more depth (10), 5 normal basis vectors
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin, 5 Screen basis vectors';
+        params.metaparams.AxLabel = '10d0-100, 1h, 1v bin, 5ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1), 999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+    case 46
+        % Arg 7, w/ sky (abs depth)
+        % Add more depth (10), 9 normal basis vectors
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors';
+        params.metaparams.AxLabel = '10d0-100, 1h, 1v bin, 9ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1), 999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        % NOTE! It is not a terribly easy problem to place equi-distant points
+        % around a sphere or half-sphere. See:
+        % http://www.math.niu.edu/~rusin/known-math/95/sphere.faq
+        % ...for potential improvements in selecting normal bin centers
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead %% NOTE! This is still fuckt: this direction in the Blender world is supposed to be -1
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true; 
+        
+%%% --- Abs. depth, Depth-only models (5, 7, 10 depths), with sky --- %%%
+    case 47
+        % 5 depth 0-100, 1 normal basis vector
+        params.metaparams.Descr = '5 depth x 1 horiz x 1 vert bin, sky';
+        params.metaparams.AxLabel = '5d0-100, 1h, 1v bin, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true; 
+        
+    case 48
+        % 7 depths 5-100, 1 normal basis vector
+        params.metaparams.Descr = '7 depth x 1 horiz x 1 vert bin, sky';
+        params.metaparams.AxLabel = '7d5-100, 1h, 1v bin, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 7;
+        % NOTE: mo'better depth divisions:
+        d = logspace(log10(5),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+        
+    case 49
+        % 10 depth 0-100, 1 normal basis vector
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin, sky';
+        params.metaparams.AxLabel = '10d0-100, 1h, 1v bin, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+%%% --- Revisitation of original params with depth max at 999
+    case 50
+         % 9 normal vectors, 1 depth, max depth 999 (no sky) (arg 25, with max depth 999)
+        params.metaparams.Descr = '1 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors';
+        params.metaparams.AxLabel = '1d, 1h, 1v bin, 9ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        % nDepthDivs = 1;
+        params.DepthDiv = [0,999];
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;
+    case 51
+	% 1 normal, 5 depth, max depth 999 (no sky) 
+        params.metaparams.Descr = '5 depth x 1 horiz x 1 vert bin, 5 Screen basis vectors';
+        params.metaparams.AxLabel = '5d0-100, 1h, 1v bin, 5ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;
+    case 52
+	% 9 normals, 5 depths, max depth 999 (no sky)
+        params.metaparams.Descr = '5 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors';
+        params.metaparams.AxLabel = '5d0-100, 1h, 1v bin, 9ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;
+    case 53
+	% 9 normals, 10 depths, max depth 999, no sky
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin, 9 Screen basis vectors';
+        params.metaparams.AxLabel = '10d0-100, 1h, 1v bin, 9ScNorms';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        % NOTE! It is not a terribly easy problem to place equi-distant points
+        % around a sphere or half-sphere. See:
+        % http://www.math.niu.edu/~rusin/known-math/95/sphere.faq
+        % ...for potential improvements in selecting normal bin centers
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            -1 1 -1; 1,1,-1; 1,1,1; -1,1,1; % 4 45 deg. cube corners
+            0,1,0]; % straight-ahead %% NOTE! This is still fuckt: this direction in the Blender world is supposed to be -1
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;
+    case 54
+	% 1 normal, 10 depths, max depth 999, no sky
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin';
+        params.metaparams.AxLabel = '10d0-100, 1h, 1v bin';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [0,d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;
+    case 55
+	% 5 normal, 1 depths, max depth 999, no sky
+        params.metaparams.Descr = '5 norm x 1 depth x 1 horiz x 1 vert bin';
+        params.metaparams.AxLabel = '10d0-100, 1h, 1v bin';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        params.DepthDiv = [0, 999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [-1 0 0; 1 0 0; 0 0 -1; 0 0 1; % 4 in-plane axes:
+            0,1,0]; % straight-ahead
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;
+
+%%% --- Fixing dependent model channels --- %%%
+% Should be 1n<5-10>ad1x1<no-w>sky
+
+%%% --- Abs. depth, Depth-only models (5, 7, 10 depths), with sky --- %%%
+    case 147
+        % 5 depth 0-100, 1 normal basis vector
+        params.metaparams.Descr = '5-1=4 depth x 1 horiz x 1 vert bin, sky';
+        params.metaparams.AxLabel = '4d0-100, 1h, 1v bin, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true; 
+        
+    case 148
+        % 7 depths 5-100, 1 normal basis vector
+        params.metaparams.Descr = '7-1=6 depth x 1 horiz x 1 vert bin, sky';
+        params.metaparams.AxLabel = '6d1-100, 1h, 1v bin, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 7;
+        % NOTE: mo'better depth divisions:
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+        
+    case 149
+        % 10 depth 0-100, 1 normal basis vector
+        params.metaparams.Descr = '10-1=9 depth x 1 horiz x 1 vert bin, sky';
+        params.metaparams.AxLabel = '9d0-100, 1h, 1v bin, sky';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = true;
+        
+    case 154
+        % 1 normal, 10 depths, max depth 999, no sky
+        params.metaparams.Descr = '10-1=9 depth x 1 horiz x 1 vert bin';
+        params.metaparams.AxLabel = '9d0-100, 1h, 1v bin';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 10;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;        
+    
+    case 155
+        % 1 normal, 5 depths, max depth 999, no sky
+        params.metaparams.Descr = '5-1=4 depth x 1 horiz x 1 vert bin';
+        params.metaparams.AxLabel = '4d0-100, 1h, 1v bin';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 5;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;              
+
+    case 156
+	% 1 normal, 7 depths, max depth 999, no sky
+        params.metaparams.Descr = '10 depth x 1 horiz x 1 vert bin';
+        params.metaparams.AxLabel = '10d0-100, 1h, 1v bin';
+        nHorizDivs = 1;
+        params.HorizDiv = linspace(0,1,nHorizDivs+1);
+        params.HorizDiv(end) = inf;
+        nVertDivs = 1;
+        params.VertDiv = linspace(0,1,nVertDivs+1);
+        params.VertDiv(end) = inf;
+        % Normalize by depth
+        params.depthNormalize = false;
+        % check on histograms of depth across scenes to verify that 
+        % (0,1.0000, 3.1623, 10.0000, 31.6228,inf) is a good division of space
+        nDepthDivs = 7;
+        d = logspace(log10(1),log10(100),nDepthDivs);
+        params.DepthDiv = [d(1:end-1),999]; 
+        %%% Normal bins
+        % Centers of normal bins:
+        params.normBinCenters = [0,1,0]; % straight-ahead only
+        % Keep normals in screen coordinates
+        params.normParams.removeComponent = [0,0,0];
+        params.sky_channel = false;      
+        
+    case 157
+        % 9 normals, 10depths, max depth 999, w/ sky, + depthNormalize = True
+        params = preprocSceneDepthNormals_GetMetaParams(46);
+        params.depthNormalize = true; % true may be better; false to not break legacy code
+%%% --- To come: tiled depth-only models, relative depth models, tiled relative depth models --- %%%
+    
+
+
 %%% --- Testing equivalence (or near equivalence) with HoN models: 
-    case 101
+    case 201
         % 1 depth 9 normal basis vectors
         params.metaparams.Descr = '1 depth x 9 horiz x 9 vert bin, 9 Screen basis vectors';
         params.metaparams.AxLabel = '1d, 9h, 9v bin, 9ScreenNorms';

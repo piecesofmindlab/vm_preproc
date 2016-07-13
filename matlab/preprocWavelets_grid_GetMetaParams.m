@@ -871,7 +871,7 @@ switch Arg
         pp.directionSelective = 1;
         % Spatial extent params
         pp.sfdivisions = 5;
-        pp.sfmax = 24; %
+        pp.sfmax = 32; %
         pp.sfmin = 2; %
         pp.f_step_log = 1; % Applies to both SF and TF?
         pp.std_step = 3.5; % Governs how closely spaced channels are
@@ -961,6 +961,57 @@ switch Arg
         pp.phasemode = 0; % Determines how to do phase (square & sum quadrature pairs, etc)
         pp.phasemode_sfmax = NaN; % No idea
         pp.zeromean = 1;              
+        
+    case 81
+        % smaller motion energy model
+        pp = preprocWavelets_grid_GetMetaParams(1);
+        % Temporal frequency params
+        pp.tfdivisions = 3;
+        pp.tfmax = 2.66667; % = 4hz @ 60 fps # was 15
+        pp.tfmin = 1.33333; % = 2hz @ 60 fps # was 15
+        pp.tsize = 40; % This is the only change that needed making... Yes?
+        pp.tf_gaussratio = 10; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 1;
+        pp.f_gaussratio = .5;
+    case 82
+        % larger motion energy model
+        pp = preprocWavelets_grid_GetMetaParams(2);
+        % Temporal frequency params
+        pp.tfdivisions = 3;
+        pp.tfmax = 2.66667; % = 4hz @ 60 fps # was 15
+        pp.tfmin = 1.33333; % = 2hz @ 60 fps # was 15
+        pp.tsize = 40; % This is the only change that needed making... Yes?
+        pp.tf_gaussratio = 10; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 1;
+        pp.f_gaussratio = .5;
+    case 83
+        % smaller motion energy model
+        pp = preprocWavelets_grid_GetMetaParams(1);
+        % Temporal frequency params
+        pp.tfdivisions = 3;
+        pp.tfmax = 2.66667; % = 4hz @ 60 fps # was 15
+        pp.tfmin = 1.33333; % = 2hz @ 60 fps # was 15
+        pp.tsize = 20; % This is the only change that needed making... Yes?
+        pp.tf_gaussratio = 10; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 1;
+        pp.f_gaussratio = .5;
+    case 84
+        % larger motion energy model
+        pp = preprocWavelets_grid_GetMetaParams(2);
+        % Temporal frequency params
+        pp.tfdivisions = 3;
+        pp.tfmax = 2.66667; % = 4hz @ 60 fps # was 15
+        pp.tfmin = 1.33333; % = 2hz @ 60 fps # was 15
+        pp.tsize = 20; % This is the only change that needed making... Yes?
+        pp.tf_gaussratio = 10; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 1;
+        pp.f_gaussratio = .5;
+
+        
     case 102
         % special case for preprocessing for LocalizedWhiteNoise stim
         pp = preprocWavelets_grid_GetMetaParams(2);
@@ -968,6 +1019,7 @@ switch Arg
     case 106
         pp = preprocWavelets_grid_GetMetaParams(6);
         pp.zeromean_value = 60.3156;
+        
     case 201
         % larger motion energy model for multi-session fMRI data sets
         % /ephys? : NO TEMPORAL CHANNELS, w/ pyr, w/ ori

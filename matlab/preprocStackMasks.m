@@ -29,7 +29,7 @@ function MaskStack = preprocStackMasks(S,params,db)
 %   (.chunkN) = set for recursive slurm calls only; see code (do not set!)
 %   .session = 1; % Experiment session
 % 	.sDir = '/auto/k7/mark/StimDB/'; % Where to save this file
-% 	.sHz = 15; % Stim presentation rate
+% 	.hz = 15; % Stim presentation rate
 % 	.exp = 'dummy'; % Experiment identifier string
 %  db = mlabSTRFdb instance, for saving concatenated mask files to
 %         database. If omitted, nothing is stored.
@@ -73,8 +73,8 @@ dParams.ChunkSz = 5000; % n frames per chunk of stimulus
 dParams.parallel = true; % slurm call to parallelize 
 dParams.mThresh = 5;
 dParams.session = 1; % Experiment session
-dParams.sDir = '/auto/k7/mark/StimDB/'; % Where to save this file
-dParams.sHz = 15; % Stim presentation rate
+dParams.path = '/auto/k7/mark/StimDB/'; % Where to save this file
+dParams.hz = 15; % Stim presentation rate
 dParams.exp = 'dummy'; % Experiment identifier string
 if ~exist('params','var')
     params = struct;
@@ -198,14 +198,14 @@ for iChunk = procChunks
     %keyboard
     if Is_Save
         %Ss = Stimulus([],struct('StimClass','Masks',...
-        Ss = Stimulus(MaskStack,struct('StimClass','Masks',...
-            'part',iChunk,'nParts',nChunks,'nFrames',ThisChunkSz,...
-            'sz',[params.sz,params.nMasksMax],'session',params.session,'sHz',params.sHz,...
-            'exp',params.exp,'sDir',params.sDir),db);
+        Ss = Stimulus(MaskStack,struct('stim_class','Masks',...
+            'part',iChunk,'n_parts',nChunks,'n_frames',ThisChunkSz,...
+            'sz',[params.sz,params.nMasksMax],'session',params.session,'hz',params.hz,...
+            'exp',params.exp,'path',params.path),db);
         if isfield(params,'trnval')
-            Ss.extra.trnval = params.trnval;
+            Ss.extras.trnval = params.trnval;
         end
-        Ss.save(Ss.extra.sDir);
+        Ss.save(Ss.path);
         clear Ss;
     end
 end
