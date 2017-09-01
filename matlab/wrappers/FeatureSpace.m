@@ -245,18 +245,34 @@ classdef FeatureSpace
             if ~isfield(SppChk,'fname') || isempty(SppChk.fname)
                 SppChk.fname = [SppChk.(xID) '.mat'];
             end
+            if length(SppChk.path) > 1 && (strcmp(SppChk.path(1:6), 'cloud:') || strcmp(SppChk.path(1:3), 's3:'))
+                SppChk.fname = strrep(SppChk.fname, '.mat', '.hdf');
+            end
+
             if ~isempty(self.dbi)
                 % Save stimulus to database
                 self.dbi.save(SppChk)
             end
             % Save preproc stimulus to file
-            sfile = fullfile(SppChk.path,SppChk.fname);
-            mio = matfile(sfile,'writable',true);
-            mio.props = SppChk;
-            mio.Spreproc = tmp;
-            if exist('params','var') && ~isempty(params)
-                % Optionally save whole preproc params struct
-                mio.params = params;
+            if length(SppChk.path) > 1 && (strcmp(SppChk.path(1:6), 'cloud:') || strcmp(SppChk.path(1:3), 's3:'))
+                if exist('params','var') && ~isempty(params)
+                    meta = {params};
+                else
+                    meta = {};
+                end
+                % Note: no saving of "props". So it goes. if it's in the
+                % cloud, it's assumed to be in the database, so 'props'
+                % will be in the databse. 
+                save_array_cloud(SppChk.path, SppChk.fname, struct('Spreproc', tmp), meta{:})
+            else
+                sfile = fullfile(SppChk.path,SppChk.fname);
+                mio = matfile(sfile,'writable',true);
+                mio.props = SppChk;
+                mio.Spreproc = tmp;
+                if exist('params','var') && ~isempty(params)
+                    % Optionally save whole preproc params struct
+                    mio.params = params;
+                end
             end
         end
     end

@@ -220,7 +220,7 @@ classdef preprocStep
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             if isfield(self.params,'PP')
                 % if not last stage of preprocessing, save in temporary preprocessing folder
-                TempDir = '/auto/k8/tempcache/';
+                TempDir = 'cloud:mark:cache';
                 ppStep = preprocStep(self.params.PP.class,self.S,self.params.PP,self.dbi,TempDir,self.tmpDir);
                 [self.S,self.params.PP] = ppStep.run();
             end

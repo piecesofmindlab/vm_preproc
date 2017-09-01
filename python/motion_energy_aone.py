@@ -1,0 +1,595 @@
+'''Motion-energy filters (after Nishimoto, 2011)
+
+Adapted from:
+/auto/k1/shinji/matlab/strflab_adds/make3dgabor_frames.m
+/auto/k1/shinji/matlab/strflab_adds/preprocWavelets_grid.m
+/auto/k1/shinji/matlab/strflab_adds/preprocWaveletsNonLinear.m
+
+Anwar O. Nunez-Elizalde (Jan, 2016)
+'''
+from __future__ import division
+
+import itertools
+from PIL import Image
+import numpy as np
+
+
+##############################
+# Helper functions
+##############################
+
+def imagearr2luminance(uint8arr, size=(96,96), filter=Image.ANTIALIAS):
+    '''Convert an array of uint8 RGB images to a luminance image
+
+    Parameters
+    ----------
+    uint8arr : 4D np.ndarray (vdim, hdim, rgb, n)
+        The uint8 RGB frames.
+
+    size : tuple, (hdim, vdim)
+        The desired output image size
+
+    filter: to be passed to PIL
+
+    Returns
+    -------
+    luminance_array = 3D np.ndarray (n, vdim, hdim)
+        The luminance image representation
+    '''
+    from scipy import misc
+    from colorspace import rgb2lab
+
+    luminance = []
+    for imdx in xrange(uint8arr.shape[-1]):
+        im = misc.toimage(uint8arr[...,imdx])
+        im = resize_image(im, size=size, filter=filter)
+        im = rgb2lab(im/255.)[...,0]
+        luminance.append(im)
+    return np.asarray(luminance)
+
+
+def resize_image(im, size=(96,96), filter=Image.ANTIALIAS):
+    '''Resize an image and return its array representation
+
+    Parameters
+    ----------
+    im : str, or PIL.Image object
+        The path to the image or a loaded PIL.Image
+    size : tuple, (hdim, vdim)
+        The desired output image size
+
+    Returns
+    -------
+    arr : uint8 np.array, (vdim, hdim, 3)
+        The resized image array
+    '''
+
+    if isinstance(im, str):
+        im = Image.open(im)
+    im.load()
+    im = im._new(im.im.stretch(size, filter))
+    im = np.asarray(im)
+    return im
+
+
+def load_image_luminance(image_files, hdim=None, vdim=None, verbose=False):
+    '''Load a set of RGB images and return its luminance representation
+
+    Parameters
+    ----------
+    image_files : list-like, (n,)
+        A list of file names.
+        The images should be in RGB uint8 format
+    hdim, vdim : int, optional
+        Horizontal and vertical dimensions, respectively.
+        If provided the images will be scaled to this size
+
+    Returns
+    -------
+    arr : 3D np.array (n,vdim,hdim)
+        The luminance representation of the images
+    '''
+
+    from colorspace import rgb2lab
+
+    if (hdim and vdim):
+        loader = lambda stim,sz: resize_image(stim,sz)
+    else:
+        loader = lambda stim,sz: np.asarray(stim)
+
+    stimuli = []
+    for fdx, fl in enumerate(image_files):
+        if verbose:
+            if fdx % 500 == 1: print fdx,
+        stimulus = Image.open(fl)
+        stimulus = loader(stimulus,(hdim,vdim))
+        stimulus = rgb2lab(stimulus/255.)[...,0]
+        stimuli.append(stimulus)
+    return np.asarray(stimuli)
+
+
+def _log_compress(x, offset=1e-05):
+    return np.log(x + offset)
+
+
+def _sqrt_sum_squares(x,y):
+    return np.sqrt(x**2 + y**2)
+
+
+def compute_spatial_gabor_responses(stimulus,
+                                    spatial_frequencies=[0,2,4,8,16,32],
+                                    quadrature_combination=_sqrt_sum_squares,
+                                    output_nonlinearity=_log_compress,
+                                    dozscore=True):
+    """Compute the spatial gabor filters' response to each stimulus.
+
+    Parameters
+    ----------
+    stimulus : 3D np.array (n, vdim, hdim)
+        The stimulus frames.
+    spatial_frequencies : array-like
+        The spatial frequencies to compute. The spatial envelope is determined by this.
+    quadrature_combination : function, optional
+        Specifies how to combine the channel reponses quadratures.
+        The function must take the sin and cos as arguments in order.
+        Defaults to: (sin^2 + cos^2)^1/2
+    output_nonlinearity : function, optional
+        Passes the channels (after `quadrature_combination`) through a
+        non-linearity. The function input is the (`n`,`nfilters`) array.
+        Defaults to: ln(x + 1e-05)
+    dozscore : bool, optional
+        Whether to z-score the channel responses in time
+
+
+    Returns
+    -------
+    filter_responses : np.array, (n, nfilters)
+    """
+    _, vdim, hdim = stimulus.shape
+    aspect_ratio = hdim/float(vdim)
+
+    stimulus = stimulus.reshape(stimulus.shape[0], -1)
+    gabor_parameters = mk_moten_pyramid_params(1.,
+                                               1.,
+                                               temporal_frequencies=[0.],
+                                               spatial_directions=[0.],
+                                               spatial_frequencies=spatial_frequencies,
+                                               )
+
+    channels = []
+
+    for idx, gabor_param in enumerate(gabor_parameters):
+        sgabor_sin, sgabor_cos, _, _ = mk_3d_gabor((hdim,vdim,1.0),
+                                                   *gabor_param,
+                                                   aspect_ratio=aspect_ratio)
+
+        channel_sin, channel_cos = dotspatial_frames(sgabor_sin, sgabor_cos, stimulus)
+        channel = quadrature_combination(channel_sin, channel_cos)
+        channels.append(channel)
+    channels = np.asarray(channels).T
+    channels = output_nonlinearity(channels)
+    if dozscore:
+        from scipy.stats import zscore
+        channels = zscore(channels)
+    return channels
+
+
+def compute_filter_responses(stimulus,
+                             stimulus_fps,
+                             gabor_temporal_window=None,
+                             quadrature_combination=_sqrt_sum_squares,
+                             output_nonlinearity=_log_compress,
+                             dozscore=True,
+                             **moten_pyramid_parameters):
+    """Compute the motion-energy filters' response to the stimuli.
+
+    Parameters
+    ----------
+    stimulus : 3D np.array (n, vdim, hdim)
+        The movie frames.
+    stimulus_fps : scalar
+        The temporal frequency of the stimulus
+    gabor_temporal_window : scalar, None
+        The number of frames in one filter.
+        If None, it defaults to floor(2/3) of `stimulus_fps`
+        Similar to Nishimoto, 2011.
+
+    quadrature_combination : function, optional
+        Specifies how to combine the channel reponses quadratures.
+        The function must take the sin and cos as arguments in order.
+        Defaults to: (sin^2 + cos^2)^1/2
+    output_nonlinearity : function, optional
+        Passes the channels (after `quadrature_combination`) through a
+        non-linearity. The function input is the (`n`,`nfilters`) array.
+        Defaults to: ln(x + 1e-05)
+    dozscore : bool, optional
+        Whether to z-score the channel responses in time
+
+    moten_pyramid_parameters: dict
+        See :func:`mk_moten_pyramid_params` for details on parameters
+        specifiying a motion-energy pyramid.
+
+    Returns
+    -------
+    filter_responses : np.array, (n, nfilters)
+    """
+    _, vdim, hdim = stimulus.shape
+    aspect_ratio = moten_pyramid_parameters.get('aspect_ratio', hdim/float(vdim))
+    stimulus = stimulus.reshape(stimulus.shape[0], -1)
+
+    if gabor_temporal_window is None:
+        gabor_temporal_window = int(stimulus_fps*(2./3.))
+
+    gabor_parameters = mk_moten_pyramid_params(stimulus_fps,
+                                               gabor_temporal_window,
+                                               **moten_pyramid_parameters)
+
+    channels = []
+
+    for idx, gabor_param in enumerate(gabor_parameters):
+        gabor = mk_3d_gabor((hdim,vdim,gabor_temporal_window),
+                            *gabor_param,
+                            aspect_ratio=aspect_ratio)
+        gabor0, gabor90, tgabor0, tgabor90 = gabor
+
+        channel_sin, channel_cos = dotdelay_frames(gabor0, gabor90,
+                                                   tgabor0, tgabor90,
+                                                   stimulus,
+                                                   )
+        channel = quadrature_combination(channel_sin, channel_cos)
+        channels.append(channel)
+    channels = np.asarray(channels).T
+    channels = output_nonlinearity(channels)
+    if dozscore:
+        from scipy.stats import zscore
+        channels = zscore(channels)
+    return channels
+
+
+def mk_spatiotemporal_gabor(spatial_gabor_sin, spatial_gabor_cos,
+                            temporal_gabor_sin, temporal_gabor_cos):
+    '''Make 3D motion-energy filter defined by the spatial and temporal gabors.
+
+    Takes the output of :func:`mk_3d_gabor` and constructs the 3D filter.
+    This is useful for visualization.
+
+    Parameters
+    ----------
+    spatial_gabor_sin, spatial_gabor_cos : np.array, (vdim,hdim)
+        Spatial gabor quadrature pair
+    temporal_gabor_sin, temporal_gabor_cos : np.array, (tdim)
+        Temporal gabor quadrature pair
+
+    Returns
+    -------
+    motion_energy_filter : np.array, (vdim, hdim, tdim)
+        The 3D motion-energy filter
+
+    '''
+    a = np.dot(-spatial_gabor_sin.ravel()[...,None], temporal_gabor_sin[...,None].T)
+    b = np.dot(spatial_gabor_cos.ravel()[...,None], temporal_gabor_cos[...,None].T)
+    x,y = spatial_gabor_sin.shape
+    t = temporal_gabor_sin.shape[0]
+    return (a+b).reshape(x,y,t)
+
+
+def mk_moten_pyramid_params(movie_hz,
+                            gabor_hz,
+                            temporal_frequencies=[0,2,4],
+                            spatial_frequencies=[0,2,4,8,16,32],
+                            spatial_directions=[0,45,90,135,180,225,270,315],
+                            sf_gauss_ratio=0.6,
+                            max_spatial_env=0.3,
+                            gabor_spacing=3.5,
+                            tf_gauss_ratio=10.,
+                            max_temp_env=0.3,
+                            aspect_ratio=1.0,
+                            include_edges=False,
+                            ):
+    """Parametrize a motion-energy pyramid that tiles the stimulus.
+
+    Parameters
+    ----------
+    movie_hz : scalar, Hz
+        Temporal resolution of the stimulus (e..g. 15)
+    gabor_hz : scalar, Hz
+        Temporal window of the motion-energy filter (e.g. 10)
+    temporal_frequencies : array-like, Hz
+        Temporal frequencies of the filters for use on the stimulus
+    spatial_frequencies : array-like, degrees
+        Spatial frequencies for the filters
+    spatial_directions : array-like, degrees
+        Direction of filter motion. Degree position corresponds
+        to standard unit-circle coordinates.
+
+
+    sf_gauss_ratio : scalar
+        The ratio of spatial frequency to gaussian s.d.
+        This controls the number of cycles in a filter
+    max_spatial_env : scalar
+        Defines the maximum s.d. of the gaussian
+    gabor_spacing : scalar
+        Defines the spacing between spatial gabors
+        (in s.d. units)
+    tf_gauss_ratio : scalar
+        The ratio of temporal frequency to gaussian s.d.
+        This controls the number of temporal cycles
+    max_temp_env : scalar
+        Defines the maximum s.d. of the temporal gaussian
+    aspect_ratio : scalar, horizontal/vertical
+        The image aspect ratio. This ensures full image
+        coverage for non-square images (e.g. 16:9)
+    include_edges : bool
+        Determines whether to include filters at the edge
+        of the image which might be partially outside the
+        stimulus field-of-view
+
+    Returns
+    -------
+    gabor_parameters : np.array, (nfilters, 7)
+        Parameters that defined the motion-energy filter
+        Each of the `nfilters` has the following parameters:
+            * centerx,centery : horizontal and vertical position
+            * direction       : direction of motion
+            * spatial_freq    : spatial frequency
+            * spatial_env     : spatial envelope (gaussian s.d.)
+            * temporal_freq   : temporal frequency
+            * temporal_env    : temporal envelope (gaussian s.d.)
+
+    Notes
+    -----
+    Same method as Nishimoto, et al., 2011.
+    """
+
+    def compute_envelope(freq, ratio):
+        return np.inf if freq == 0 else (1.0/freq)*ratio
+
+    spatial_frequencies = np.asarray(spatial_frequencies).astype(np.float)
+    spatial_directions = np.asarray(spatial_directions).astype(np.float)
+    temporal_frequencies = np.asarray(temporal_frequencies).astype(np.float)
+    include_edges = int(include_edges)
+
+    # normalize temporal frequency to wavelet size
+    temporal_frequencies = temporal_frequencies*(gabor_hz/float(movie_hz))
+
+    # We have to deal with zero frequency spatial filters differently
+    include_local_dc = True if 0 in spatial_frequencies else False
+    spatial_frequencies = np.asarray([t for t in spatial_frequencies if t != 0])
+
+    # add temporal envelope max
+    params = list(itertools.product(spatial_frequencies, spatial_directions))
+
+    gabor_parameters = []
+
+    for spatial_freq, spatial_direction in params:
+        spatial_env = min(compute_envelope(spatial_freq, sf_gauss_ratio), max_spatial_env)
+
+        # compute the number of gaussians that will fit in the FOV
+        vertical_space = np.floor(((1.0 - spatial_env*gabor_spacing)/(gabor_spacing*spatial_env))/2.0)
+        horizontal_space = np.floor(((aspect_ratio - spatial_env*gabor_spacing)/(gabor_spacing*spatial_env))/2.0)
+
+        # include the edges of screen?
+        vertical_space = max(vertical_space, 0) + include_edges
+        horizontal_space = max(horizontal_space, 0) + include_edges
+
+        # get the spatial gabor locations
+        ycenters = spatial_env*gabor_spacing*np.arange(-vertical_space, vertical_space+1) + 0.5
+        xcenters = spatial_env*gabor_spacing*np.arange(-horizontal_space, horizontal_space+1) + aspect_ratio/2.
+
+        for ii, (cx, cy) in enumerate(itertools.product(xcenters,ycenters)):
+            for temp_freq in temporal_frequencies:
+                temp_env = min(compute_envelope(temp_freq, tf_gauss_ratio), max_temp_env)
+
+                if temp_freq == 0 and spatial_direction >= 180:
+                    # 0Hz temporal filter doesn't have motion, so
+                    # 0 and 180 degrees orientations are the same filters
+                    continue
+
+                gabor_parameters.append([cx,
+                                         cy,
+                                         spatial_direction,
+                                         spatial_freq,
+                                         spatial_env,
+                                         temp_freq,
+                                         temp_env,
+                                         ])
+
+                if spatial_direction == 0 and include_local_dc:
+                    # add local 0 spatial frequency non-directional temporal filter
+                    gabor_parameters.append([cx,
+                                             cy,
+                                             spatial_direction,
+                                             0., # zero spatial freq
+                                             spatial_env,
+                                             temp_freq,
+                                             temp_env,
+                                             ])
+
+    gabor_parameters = np.asarray(gabor_parameters)
+    return gabor_parameters
+
+##############################
+# core functionality
+##############################
+
+def mk_3d_gabor(xyt,
+                centerx=0.5,
+                centery=0.5,
+                direction=45.0,
+                spatial_freq=16.0,
+                spatial_env=0.3,
+                temporal_freq=2.0,
+                temporal_env=0.3,
+                phase_offset=0.0,
+                aspect_ratio=1.0,
+                ):
+    '''Make a motion-energy filter.
+
+    A motion-energy filter is a 3D gabor with
+    two spatial and one temporal dimension.
+    Each dimension is defined by two sine waves which
+    differ in phase by 90 degrees. The sine waves are
+    then multiplied by a gaussian.
+
+    Parameters
+    ----------
+    xyt : array-like, (hdim, vdim, tdim)
+        Defines the 3D field-of-view of the filter
+        `hdim` : horizontal dimension size
+        `vdim` : vertical dimension size
+        `tdim` : temporal dimension size
+    centerx, centery : float
+        Horizontal and vertical position in space, respectively.
+        The image center is (0.5,0.5) for square aspect ratios
+    direction : float, degrees
+        Direction of spatial motion
+    spatial_freq : float
+        Spatial frequency
+    spatial_env : float
+        Spatial envelope (s.d. of the gaussian)
+    temporal_freq : float
+        Temporal frequency
+    temporal_env : float
+        Temporal envelope (s.d. of gaussian)
+    phase_offset : float, degrees
+        Phase offset for the spatial sinusoid
+    aspect_ratio : float-like,
+        Useful for preserving the spatial gabors circular even
+        when images have non-square aspect ratios. For example,
+        a 16:9 image would have `aspect_ratio`=16/9.
+
+    Returns
+    -------
+    spatial_gabor_sin, spatial_gabor_cos : np.array, (vdim,hdim)
+        Spatial gabor quadrature pair. `spatial_gabor_cos` has
+        a 90 degree phase offset relative to `spatial_gabor_sin`
+
+    temporal_gabor_sin, temporal_gabor_cos : np.array, (tdim)
+        Temporal gabor quadrature pair. `temporal_gabor_cos` has
+        a 90 degree phase offset relative to `temporal_gabor_sin`
+
+    Notes
+    -----
+    Same method as Nishimoto, et al., 2011.
+    '''
+
+    szx, szy, szt = np.asarray(xyt).astype(np.float)
+
+    dx = np.linspace(0,aspect_ratio,szx, endpoint=True)
+    dy = np.linspace(0,1,szy, endpoint=True)
+    dt = np.linspace(0,1,szt, endpoint=False)
+    ixs, iys = np.meshgrid(dx,dy)
+
+    fx = -spatial_freq*np.cos(direction/180.*np.pi)*2*np.pi
+    fy = spatial_freq*np.sin(direction/180.*np.pi)*2*np.pi
+    ft = np.real(temporal_freq)*2*np.pi
+
+    # spatial filters
+    spatial_gaussian = np.exp(-((ixs - centerx)**2 + (iys - centery)**2)/(2*spatial_env**2))
+
+    spatial_grating_sin = np.sin((ixs - centerx)*fx + (iys - centery)*fy + phase_offset)
+    spatial_grating_cos = np.cos((ixs - centerx)*fx + (iys - centery)*fy + phase_offset)
+
+    spatial_gabor_sin = spatial_gaussian * spatial_grating_sin
+    spatial_gabor_cos = spatial_gaussian * spatial_grating_cos
+
+    ##############################
+    temporal_gaussian = np.exp(-(dt - 0.5)**2/(2*temporal_env**2))
+    temporal_grating_sin = np.sin((dt - 0.5)*ft)
+    temporal_grating_cos = np.cos((dt - 0.5)*ft)
+
+    temporal_gabor_sin = temporal_gaussian*temporal_grating_sin
+    temporal_gabor_cos = temporal_gaussian*temporal_grating_cos
+
+    return spatial_gabor_sin, spatial_gabor_cos, temporal_gabor_sin, temporal_gabor_cos
+
+
+def dotspatial_frames(spatial_gabor_sin, spatial_gabor_cos,
+                      stimuli,
+                      masklimit=0.001):
+    '''Dot the spatial gabor filters filter with the stimuli
+
+    Parameters
+    ----------
+    spatial_gabor_sin, spatial_gabor_cos : np.array, (vdim,hdim)
+        Spatial gabor quadrature pair
+    stimuli : 2D np.array (n, vdim*hdim)
+        The movie frames with the spatial dimension collapsed.
+    masklimit : float-like
+        Threshold to find the non-zero filter region
+
+    Returns
+    -------
+    channel_sin, channel_cos : np.ndarray, (n, )
+        The filter response to each stimulus
+        The quadrature pair can be combined: (x^2 + y^2)^0.5
+    '''
+    gabors = np.asarray([spatial_gabor_sin.ravel(),
+                         spatial_gabor_cos.ravel()])
+
+    # dot the gabors with the stimuli
+    mask = np.abs(gabors).sum(0) > masklimit
+    gabor_prod = np.dot(gabors[:,mask].squeeze(), stimuli.T[mask].squeeze()).T
+    gabor_sin, gabor_cos = gabor_prod[:,0], gabor_prod[:,1]
+    return gabor_sin, gabor_cos
+
+
+def dotdelay_frames(spatial_gabor_sin, spatial_gabor_cos,
+                    temporal_gabor_sin, temporal_gabor_cos,
+                    stimulus,
+                    masklimit=0.001):
+    '''Convolve the motion-energy filter with a stimulus
+
+    Parameters
+    ----------
+    spatial_gabor_sin, spatial_gabor_cos : np.array, (vdim,hdim)
+        Spatial gabor quadrature pair
+
+    temporal_gabor_sin, temporal_gabor_cos : np.array, (tdim)
+        Temporal gabor quadrature pair
+
+    stimulus : 2D np.array (n, vdim*hdim)
+        The movie frames with the spatial dimension collapsed.
+
+    Returns
+    -------
+    channel_sin, channel_cos : np.ndarray, (n, )
+        The filter response to the stimulus at each time point
+        The quadrature pair can be combined: (x^2 + y^2)^0.5
+    '''
+
+    gabor_sin, gabor_cos = dotspatial_frames(spatial_gabor_sin, spatial_gabor_cos,
+                                             stimulus, masklimit=masklimit)
+    gabor_prod = np.c_[gabor_sin, gabor_cos]
+
+
+    temporal_gabors = np.asarray([temporal_gabor_sin,
+                                  temporal_gabor_cos])
+
+    # dot the product with the temporal gabors
+    outs = np.dot(gabor_prod[:, [0]], temporal_gabors[[1]]) + np.dot(gabor_prod[:, [1]], temporal_gabors[[0]])
+    outc = np.dot(-gabor_prod[:, [0]], temporal_gabors[[0]]) + np.dot(gabor_prod[:, [1]], temporal_gabors[[1]])
+
+    # sum across delays
+    nouts = np.zeros_like(outs)
+    noutc = np.zeros_like(outc)
+    tdxc = int(np.ceil(outs.shape[1]/2.0))
+    delays = np.arange(outs.shape[1])-tdxc +1
+    for ddx, num in enumerate(delays):
+        if num == 0:
+            nouts[:, ddx] = outs[:,ddx]
+            noutc[:, ddx] = outc[:,ddx]
+        elif num > 0:
+            nouts[num:, ddx] = outs[:-num,ddx]
+            noutc[num:, ddx] = outc[:-num,ddx]
+        elif num < 0:
+            nouts[:num, ddx] = outs[abs(num):,ddx]
+            noutc[:num, ddx] = outc[abs(num):,ddx]
+
+    channel_sin = nouts.sum(-1)
+    channel_cos = noutc.sum(-1)
+    return channel_sin, channel_cos
+
+
+if __name__ == '__main__':
+    pass

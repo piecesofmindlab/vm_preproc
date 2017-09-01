@@ -249,22 +249,26 @@ classdef Stimulus
                 end
             else
                 % Single file; load it.
-                if ~exist(fpath,'file')
-                    error([mfilename ':BadPath'], 'Specified load path does not exist!')
-                end
-                try
-                    tmp = load(fpath);
-                    self.S = tmp.S;
-                catch ME %#ok<NASGU>
-                    % Check ME error?
-                    % Get info first? always store as "S"?
-                    self.S = h5read(fpath,'/S');
-                    if ndims(self.S)==2
-                        % Transpose from hf5 orientation (python/matlab
-                        % difference)
-                        disp('Transposing 2D stimulus...')
-                        self.S = self.S';
-                        disp(size(self.S))
+                if strcmp(self.path(1:6), 'cloud:')
+                    self.S = load_array_cloud(self.path, self.fname, 'S');
+                else
+                    if ~exist(fpath,'file')
+                        error([mfilename ':BadPath'], 'Specified load path does not exist!')
+                    end
+                    try
+                        tmp = load(fpath);
+                        self.S = tmp.S;
+                    catch ME %#ok<NASGU>
+                        % Check ME error?
+                        % Get info first? always store as "S"?
+                        self.S = h5read(fpath,'/S');
+                        if ndims(self.S)==2
+                            % Transpose from hf5 orientation (python/matlab
+                            % difference)
+                            disp('Transposing 2D stimulus...')
+                            self.S = self.S';
+                            disp(size(self.S))
+                        end
                     end
                 end
             end            
