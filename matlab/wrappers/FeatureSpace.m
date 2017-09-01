@@ -138,20 +138,24 @@ classdef FeatureSpace
         function self = load(self)
             % load stimulus data from files
             fpath = fullfile(self.path,self.fname);
-            try
-                tmp = load(fpath);
-                self.S = tmp.Spreproc;
-            catch ME
-                disp('matfile load failed; trying to load with h5read.')
-                % Get info first? always store as "S"?
-                %try
-                self.S = h5read(fpath,'/Spreproc');
-                %catch
-                %    disp('WTF. Should be no errors for Spreproc.')
-                %    keyboard
-                %    disp('This try/catch loop for variables named either S or Spreproc is hacky as shit. Please fix me.')
-                %    self.S = h5read(fpath,'/S');
-                %end
+            if strcmp(self.path(1:6), 'cloud:')
+                self.S = load_array_cloud(self.path, self.fname, 'Spreproc');
+            else
+                try
+                    tmp = load(fpath);
+                    self.S = tmp.Spreproc;
+                catch ME
+                    disp('matfile load failed; trying to load with h5read.')
+                    % Get info first? always store as "S"?
+                    %try
+                    self.S = h5read(fpath,'/Spreproc');
+                    %catch
+                    %    disp('WTF. Should be no errors for Spreproc.')
+                    %    keyboard
+                    %    disp('This try/catch loop for variables named either S or Spreproc is hacky as shit. Please fix me.')
+                    %    self.S = h5read(fpath,'/S');
+                    %end
+                end
             end
             sz = size(self.S);
             % Fill n_frames, sz;
