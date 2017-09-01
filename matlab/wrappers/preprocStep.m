@@ -165,7 +165,7 @@ classdef preprocStep
                     end
                     disp('Found preprocessed stim in database!')
                     sfile = fullfile(docdict_check(1).path,docdict_check(1).fname);
-                    if ~exist(sfile,'file')
+                    if ~exist(sfile,'file') && ~strcmp(sfile(1:6), 'cloud:')
                         % Assume if one part is missing, all are...
                         disp('Found model, but path has been deleted! Re-preprocessing...')
                         % do something to preserve path/id??
