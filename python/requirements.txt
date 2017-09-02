@@ -1,0 +1,20 @@
+numpy>=1.6.0
+scipy>=0.9.0
+sklearn
+h5py
+json
+socket
+subprocess
+
+# overkill?
+os
+glob
+uuid
+warnings
+functools
+
+# custom - still need pip installers
+cottoncandy
+pycortex
+couchdb
+glabtools #? 

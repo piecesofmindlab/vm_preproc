@@ -1,3 +1,5 @@
+# Compute 3D scene structure features as in Lescroart & Gallant 2017
+
 def compute_normal_gradient(normals, nonlinexp=1):
     """Computes distances between normals in a pixelwise normal image.
 
