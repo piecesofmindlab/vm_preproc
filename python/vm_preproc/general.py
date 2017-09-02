@@ -1,10 +1,10 @@
 # General preprocessing steps
+from __future__ import division
+
 import numpy as np
 from utils import make_uniform, norm_std_mean
-from __future__ import division
+
 # Output nonlinearities
-
-
 def output_nonlinearity(S, method='log', **kwargs):
     """Output nonlinearity on each channel of a model. 
 
@@ -66,7 +66,7 @@ def output_nonlinearity(S, method='log', **kwargs):
         spreproc = S
     else:
         raise NotImplementedError("Other variants still WIP")
-
+    # Does not seem necessary...
     params['n_channels'] = spreproc.shape[1]
 
     return spreproc, params
@@ -201,7 +201,6 @@ def downsample(S, method='box', input_hz=None, output_hz=None,
             S = conv2(S, k.T/sum(k), 'same')
         
         S = S[sonset::fr_per_sample, :]
-
 
     # Done
     return S, params
