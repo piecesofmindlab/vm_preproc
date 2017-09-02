@@ -138,7 +138,7 @@ classdef FeatureSpace
         function self = load(self)
             % load stimulus data from files
             fpath = fullfile(self.path,self.fname);
-            if strcmp(self.path(1:6), 'cloud:')
+            if length(self.path) >=6 && strcmp(self.path(1:6), 'cloud:')
                 self.S = load_array_cloud(self.path, self.fname, 'Spreproc');
             else
                 try
