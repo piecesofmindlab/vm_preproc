@@ -2,7 +2,7 @@
 
 __version__ = 0.01
 
-from . import alexnet
+from . import alexnet_pyt
 from . import general
 from . import motion_energy_aone
 

@@ -2,7 +2,7 @@
 from __future__ import division
 
 import numpy as np
-from utils import make_uniform, norm_std_mean
+from .utils import make_uniform, norm_std_mean
 
 # Output nonlinearities
 def output_nonlinearity(S, method='log', **kwargs):

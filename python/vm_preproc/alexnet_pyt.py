@@ -68,7 +68,7 @@ def get_layer(ims, layer=1, model_class=AlexNetLayer, image_transform=None,
 
     # Get data (list of images)
     ds = fio.ImageList(ims, classes=None, transform=image_transform)
-    data_loader = fio.DataLoader(ds, batch_size=50, shuffle=False, num_workers=3)
+    data_loader = fio.DataLoader(ds, batch_size=50, shuffle=False, num_workers=num_workers)
     # Get nn model
     model = model_class(layer, **kwargs)
     # Turn off training mode (unclear if this is necessary)
@@ -81,7 +81,7 @@ def get_layer(ims, layer=1, model_class=AlexNetLayer, image_transform=None,
         # Not strictly necessary for most purposes here to have labels right here with data...
         inputs, labels = data
         if use_gpu:
-            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+            inputs, labels = Variable(inputs.cuda(0)), Variable(labels.cuda(0))
         else:
             inputs, labels = Variable(inputs), Variable(labels)
         outputs = model(inputs)
