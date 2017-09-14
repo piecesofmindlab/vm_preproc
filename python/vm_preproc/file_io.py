@@ -71,6 +71,50 @@ class ImageList(Dataset):
     def __len__(self):
         return len(self.imgs)
 
+class ImageArray(Dataset):
+    """Class to load images with no classes / labels, for simple feature extraction"""
+    def __init__(self, images, classes=None, transform=None, target_transform=None,
+                 loader=pil_loader):
+        """Class to load images
+
+        Parameters
+        ----------
+        images : array-like (possibly open hdf file)
+            size is [h, w, rgb, n] 
+            or [h, w, n]
+        classes : list | array
+            labels for each image (`n` long array or list)
+        transform : torch transform
+            Set of operations to perform on data as it is loaded
+        """
+        self.imgs = np.rollaxis(images, -1, 0)
+        if transform is None:
+            transform = default_xfm
+        if classes is None:
+            classes = np.zeros((len(self.imgs),),dtype=np.int)
+        self.classes = classes
+        self.transform = transform
+        self.target_transform = target_transform
+        self.loader = loader
+
+    def __getitem__(self, index):
+        
+        img = self.imgs[index]
+        if np.ndim(img)==2:
+            img = np.tile(img[:,:,np.newaxis], [1,1,3])
+        img = Image.fromarray((img*255).astype(np.uint8))
+        target = self.classes[index]
+        if self.transform is not None:
+            img = self.transform(img)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return img, target
+
+    def __len__(self):
+        return len(self.imgs)
+
+
 class SimpleImageFolder(Dataset):
     """Class to load images with no classes / labels, for simple feature extraction"""
     def __init__(self, images, transform=default_xfm, target_transform=None,
