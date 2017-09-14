@@ -67,10 +67,16 @@ def get_layer(ims, layer=1, model_class=AlexNetLayer, image_transform=None,
     ims is a list of image file names"""
 
     # Get data (list of images)
-    ds = fio.ImageList(ims, classes=None, transform=image_transform)
+    if isinstance(ims, list):
+        ds = fio.ImageList(ims, classes=None, transform=image_transform)
+    else:
+        # Array
+        ds = fio.ImageArray(ims, classes=None, transform=image_transform)
     data_loader = fio.DataLoader(ds, batch_size=50, shuffle=False, num_workers=num_workers)
     # Get nn model
     model = model_class(layer, **kwargs)
+    if use_gpu:
+        model = model.cuda()
     # Turn off training mode (unclear if this is necessary)
     model.train(False)
     # Preallocate variables & start timing    
@@ -91,7 +97,7 @@ def get_layer(ims, layer=1, model_class=AlexNetLayer, image_transform=None,
             #pdb.set_trace()
             iter_times.append(time.time() - last_tic)
             last_tic = time.time()
-            avg_iter = np.meansum(iter_times) / len(iter_times)
+            avg_iter = np.mean(iter_times)
             print("{:06d}/{:06d}: t/20i = {:.2f}".format(ibatch, len(data_loader), avg_iter))
 
     features = torch.cat(all_outputs, dim=0).numpy()
