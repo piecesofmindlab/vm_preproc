@@ -66,15 +66,30 @@ def get_layer(ims, layer=1, model_class=AlexNetLayer, image_transform=None,
 
     ims is a list of image file names"""
 
-    # Get data (list of images)
+    # Get nn model
+    model = model_class(layer, **kwargs)
+    features = run_cnn(ims, model, image_transform=image_transform, 
+                   use_gpu=use_gpu, num_workers=num_workers, **kwargs)
+    return features
+
+def run_cnn(ims, model, image_transform=None, 
+    use_gpu=False, num_workers=3, **kwargs):
+    """Currently for pre-trained alexnet only
+
+    retrieves activations of alexnet for specified layer
+
+    ims is a list of image file names"""
+
+    # Convert data to pytorch variable
     if isinstance(ims, list):
         ds = fio.ImageList(ims, classes=None, transform=image_transform)
     else:
-        # Array
         ds = fio.ImageArray(ims, classes=None, transform=image_transform)
     data_loader = fio.DataLoader(ds, batch_size=50, shuffle=False, num_workers=num_workers)
     # Get nn model
-    model = model_class(layer, **kwargs)
+    if model is None:
+        model = alexnet_model
+    # Graphics card or no
     if use_gpu:
         model = model.cuda()
     # Turn off training mode (unclear if this is necessary)
