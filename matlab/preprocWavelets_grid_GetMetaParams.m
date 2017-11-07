@@ -491,6 +491,42 @@ switch Arg
         pp.phasemode_sfmax = NaN; % No idea
         pp.zeromean = 1;        
     % 15 reserved for ??
+    
+    case 15
+        % Extra large motion energy model (many spatial locations)
+        % NO ORIENTATIONS, NO TF
+        % STRFlab conventions, housekeeping
+        pp.class = 'preprocWavelets_grid';
+        pp.show_or_preprocess = 1;
+        pp.wrap_all = 0;
+        pp.verbose = 1;
+        pp.gaborcachemode = 0;
+        pp.valid_w_index = NaN;
+        % Temporal frequency params
+        pp.tfdivisions = 1;
+        pp.tfmax = 0;
+        pp.tfmin = 0;
+        pp.tsize = 1;
+        pp.tf_gaussratio = 1; 
+        pp.tenv_max = 0.3000;
+        pp.zerotf = 1;
+        % Orientation/direction params
+        pp.dirdivisions = 0;
+        pp.local_dc = 1; 
+        pp.directionSelective = 0;
+        % Spatial extent params
+        pp.sfdivisions = 5;
+        pp.sfmax = 42; %32; %
+        pp.sfmin = 2; %
+        pp.f_step_log = 1; % Applies to both SF and TF?
+        pp.std_step = 3.5; % Governs how closely spaced channels are
+        pp.sf_gaussratio = 0.6000; % 81 channels @maxsf=24; 9x9 ; 13x13 @maxsf=32
+        pp.fenv_mode = 0; % (whether to use fenv_max for both senv_max and tenv_max) 
+        pp.senv_max = 0.3000;
+        % Nonlinearities
+        pp.phasemode = 0; % Determines how to do phase (square & sum quadrature pairs, etc)
+        pp.phasemode_sfmax = NaN; % No idea
+        pp.zeromean = 1;            
     case 16
         % larger motion energy model
         % NO TEMPORAL CHANNELS, but with time window = 10
