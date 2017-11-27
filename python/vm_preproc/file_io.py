@@ -5,8 +5,18 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
+# Misc functions
 def pil_loader(path):
-    return Image.open(path).convert('RGB')
+    pil_im = Image.open(path)
+    # If alpha channel exists, get rid of it
+    bands = pil_im.getbands() # Returns, e.g., ['R', 'G', 'B', 'A']
+    if 'A' in bands:
+        # Add (white) background 
+        bg = Image.fromarray(np.ones(pil_im.size + (len(bands),), dtype=np.uint8)*255)
+        pil_im_alpha = Image.alpha_composite(bg, pil_im)
+        return pil_im_alpha.convert('RGB')
+    else:
+        return pil_im.convert('RGB')
 
 # Transforms for data input
 def get_xfm(scale=224, center_crop=None, tensor=True, normalize=True, **kwargs):

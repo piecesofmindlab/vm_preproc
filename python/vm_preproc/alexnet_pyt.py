@@ -73,7 +73,7 @@ def get_layer(ims, layer=1, model_class=AlexNetLayer, image_transform=None,
     return features
 
 def run_cnn(ims, model, image_transform=None, 
-    use_gpu=False, num_workers=3, **kwargs):
+    use_gpu=False, num_workers=3, data_loader=None, **kwargs):
     """Currently for pre-trained alexnet only
 
     retrieves activations of alexnet for specified layer
@@ -82,7 +82,9 @@ def run_cnn(ims, model, image_transform=None,
 
     # Convert data to pytorch variable
     if isinstance(ims, list):
-        ds = fio.ImageList(ims, classes=None, transform=image_transform)
+        if data_loader is None:
+            data_loader = fio.pil_loader
+        ds = fio.ImageList(ims, classes=None, transform=image_transform, data_loader=data_loader)
     else:
         ds = fio.ImageArray(ims, classes=None, transform=image_transform)
     data_loader = fio.DataLoader(ds, batch_size=50, shuffle=False, num_workers=num_workers)
