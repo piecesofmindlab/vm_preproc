@@ -102,7 +102,7 @@ def run_cnn(ims, model, image_transform=None,
         # Not strictly necessary for most purposes here to have labels right here with data...
         inputs, labels = data
         if use_gpu:
-            inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
+            inputs, labels = Variable(inputs.cuda(0), volatile=True), Variable(labels.cuda(0), volatile=True)
         else:
             inputs, labels = Variable(inputs), Variable(labels)
         outputs = model(inputs)
