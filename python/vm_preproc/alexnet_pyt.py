@@ -13,11 +13,12 @@ import time
 from . import file_io as fio
 
 ### --- Base AlexNet model --- ###
+# This is a memory hog at load time; consider commenting out and loading in functions below
 alexnet_model = pytmodels.alexnet(pretrained=True)
 
 class AlexNetLayer(nn.Module):
     """Allows feature output from different layers of Alexnet"""
-    def __init__(self, layer, base_network=alexnet_model):
+    def __init__(self, layer, base_network=alexnet_model): # base_network=None
         """
         Parameters
         ----------
@@ -26,6 +27,8 @@ class AlexNetLayer(nn.Module):
         """
         super(AlexNetLayer, self).__init__()
         self.layer = layer
+        if base_network is None:
+            base_network = pytmodels.alexnet(pretrained=True)
         #55 27
         if layer == 1:
             self.features = nn.Sequential(*(list(base_network.features.children())[:3]))
