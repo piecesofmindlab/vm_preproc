@@ -193,7 +193,7 @@ def motion_energy(stimulus,
     pixels_per_degree = np.mean([px/deg for px, deg in zip([im_y, im_x], stimulus_size_degrees)])
     if zeromean is True:
         if verbose:
-            print('[[zero mean stimuli]]'):
+            print('[[zero mean stimuli]]')
         zeromean = stimulus.mean()
         stimulus -= zeromean
         
