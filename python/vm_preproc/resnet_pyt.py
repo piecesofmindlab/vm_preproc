@@ -14,7 +14,7 @@ from . import file_io as fio
 
 
 def get_layer(ims, layers=('maxpool',), model=None, image_transform=None, 
-    use_gpu=False, num_workers=3, **kwargs): # , data_loader=None
+    use_gpu=False, num_workers=3, data_loader=None):
     """Retrieves activations of ResNet for specified layer(s)
 
     Only works for top-level layers (for now). 
@@ -37,7 +37,7 @@ def get_layer(ims, layers=('maxpool',), model=None, image_transform=None,
     if isinstance(ims, list):
         if data_loader is None:
             data_loader = fio.pil_loader
-        ds = fio.ImageList(ims, classes=None, transform=image_transform, data_loader=data_loader)
+        ds = fio.ImageList(ims, classes=None, transform=image_transform, loader=data_loader)
     else:
         ds = fio.ImageArray(ims, classes=None, transform=image_transform)
     # Make modifiable?
@@ -63,9 +63,9 @@ def get_layer(ims, layers=('maxpool',), model=None, image_transform=None,
         hooks = []
         # Instantiate specific hook for each layer (?)
         for layer in layers:
-            tmp = getattr(resnet, layer).register_forward_hook(layer_hook)
+            tmp = getattr(model, layer).register_forward_hook(layer_hook)
             hooks.append(tmp)
-        print('n hooks:', len(hooks))
+        #print('n hooks:', len(hooks))
         # Not strictly necessary for most purposes here to have labels right here with data...
         inputs, labels = data
         if use_gpu:
@@ -73,9 +73,11 @@ def get_layer(ims, layers=('maxpool',), model=None, image_transform=None,
         else:
             inputs, labels = Variable(inputs), Variable(labels)
         final_output = model(inputs)
-        print('len(layer_outputs):', len(layer_outputs))
+        for h in hooks:
+            h.remove()
+        # print('len(layer_outputs):', len(layer_outputs))
         for layer, o in zip(layers, layer_outputs):
-            all_outputs[layer].append(outputs.data.cpu().clone())
+            all_outputs[layer].append(o.data.cpu().clone())
         # Print progress every {20} iterations
         if (ibatch > 0) and (ibatch % 20 == 0):
             #pdb.set_trace()
