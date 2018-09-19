@@ -8,7 +8,7 @@ classdef preprocStep
         tmpDir
     end
     methods
-        function self = preprocStep(fn,S,params,dbi,sDir,tmpDir)
+        function self = preprocStep(fn,S,params,dbi,sDir,tmpDir,do_deep_check)
             % Usage: ppStep = preprocStep(fn,S,params [,dbi] [,tmpDir])
             %
             % Generalized preprocessing step in preproc pipeline.
@@ -58,6 +58,9 @@ classdef preprocStep
                 self.tmpDir = tmpDir;
             else
                 self.tmpDir = '/tmp/';
+            end
+            if ~exist('do_deep_check', 'var')
+                do_deep_check = true;
             end
         end
         
@@ -140,7 +143,7 @@ classdef preprocStep
                 disp(qStr.ppseq)
                 docdict_check = self.dbi.query(qStr);
                 if isempty(docdict_check)
-                    if length(qStr.oStimulus)>1
+                    if length(qStr.oStimulus)>1 and do_deep_check;
                         disp('(*thoroughly* searching)')
                         oStim = qStr.oStimulus;
                         tmpdd = cell(length(oStim),1);
