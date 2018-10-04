@@ -6,6 +6,7 @@ classdef preprocStep
         dbi
         sDir
         tmpDir
+        do_deep_check
     end
     methods
         function self = preprocStep(fn,S,params,dbi,sDir,tmpDir,do_deep_check)
@@ -60,7 +61,9 @@ classdef preprocStep
                 self.tmpDir = '/tmp/';
             end
             if ~exist('do_deep_check', 'var')
-                do_deep_check = true;
+                self.do_deep_check = true;
+            else
+                self.do_deep_check = do_deep_check;
             end
         end
         
@@ -143,7 +146,8 @@ classdef preprocStep
                 disp(qStr.ppseq)
                 docdict_check = self.dbi.query(qStr);
                 if isempty(docdict_check)
-                    if length(qStr.oStimulus)>1 and do_deep_check;
+                    if length(qStr.oStimulus)>1 & self.do_deep_check;
+                        error('Whoa nelly!')
                         disp('(*thoroughly* searching)')
                         oStim = qStr.oStimulus;
                         tmpdd = cell(length(oStim),1);
@@ -224,7 +228,7 @@ classdef preprocStep
             if isfield(self.params,'PP')
                 % if not last stage of preprocessing, save in temporary preprocessing folder
                 TempDir = 'cloud:mark:cache';
-                ppStep = preprocStep(self.params.PP.class,self.S,self.params.PP,self.dbi,TempDir,self.tmpDir);
+                ppStep = preprocStep(self.params.PP.class,self.S,self.params.PP,self.dbi,TempDir,self.tmpDir, self.do_deep_check);
                 [self.S,self.params.PP] = ppStep.run();
             end
             
