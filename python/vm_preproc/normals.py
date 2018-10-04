@@ -70,7 +70,7 @@ NORM_BIN_CENTERS = np.array([[-1, 0, 0],  # Cardinal directions
 N_BINS_DIST = 10
 MAX_DIST = 100
 DIST_BIN_EDGES = np.logspace(np.log10(1), np.log10(MAX_DIST), N_BINS_DIST)
-DIST_BIN_EDGES = np.hstack([0, DIST_BIN_EDGES[:-1], np.inf])
+DIST_BIN_EDGES = np.hstack([0, DIST_BIN_EDGES[:-1], 999])
 
 
 def compute_distance_orientation_bins(normals,
