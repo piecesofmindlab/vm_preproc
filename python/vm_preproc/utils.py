@@ -95,3 +95,11 @@ def ensure_monotonic(x):
             else:
                 x[ii] = x[ii-1] + 10^(np.log10(np.abs(x[ii-1])))
     return x
+
+
+def circ_dist(a, b):
+    """Angle between two angles
+    """
+    phi = np.e**(1j*a) / np.e**(1j*b)
+    ang_dist = np.arctan2(phi.imag, phi.real)
+    return ang_dist

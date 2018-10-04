@@ -1,10 +1,11 @@
 # Tools for preprocessing stimuli
 
-__version__ = 0.01
+__version__ = 0.02
 
 from . import alexnet_pyt
 from . import resnet_pyt
 from . import general
+from . import normals
 from . import motion_energy_aone
 #from . import motion_energy
 

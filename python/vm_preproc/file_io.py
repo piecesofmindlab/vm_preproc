@@ -4,6 +4,8 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+import cv2
+
 
 # Misc functions
 def pil_loader(path):
@@ -248,6 +250,37 @@ class HDFDataSet(Dataset):
 
     def __len__(self):
         return len(self.total_count)
+
+def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True):
+    """Load an exr (floating point) image to surface normal array
+
+    """
+    img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
+    imc = img-1
+    y, z, x = imc.T
+    rev_x = xflip
+    rev_y = yflip
+    rev_z = zflip
+    if rev_x: 
+        x = -x
+    if rev_y:
+        y = -y
+    if rev_z:
+        z = -z
+    imc = np.dstack([x.T,y.T,z.T])
+    if clip:
+        imc = np.clip(imc, -1, 1)
+    return imc
+
+
+def load_exr_zdepth(fname, thresh=1000):
+    """Load an exr (floating point) image to absolute distance array"""
+    img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
+    z = img[..., 0]
+    z[z > thresh] = np.nan
+    return z
+
+
 # Stubs. Good ideas, from https://discuss.pytorch.org/t/use-of-dataset-class/1620/4
 # class MergedDataset(Dataset):
 #     """Class to load images from hdf files"""
