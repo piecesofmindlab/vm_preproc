@@ -1,4 +1,14 @@
 # Compute 3D scene structure features as in Lescroart & Gallant 2017
+import numpy as np
+from skimage import color as skcol
+import cv2
+from . import utils 
+
+# Colormap(s)
+from matplotlib.colors import LinearSegmentedColormap
+RET = LinearSegmentedColormap.from_list('RET', 
+        [(1, 0, 0), (1., 1., 0), (0, 0, 1), (0, 1., 1), (1., 0, 0)])
+
 
 def compute_normal_gradient(normals, nonlinexp=1):
     """Computes distances between normals in a pixelwise normal image.
@@ -39,11 +49,7 @@ def compute_normal_gradient(normals, nonlinexp=1):
     return grad_mag, grad_ori
 
 
-
-# 4 in-plane axes:
-# 4 45 deg. cube corners
-# straight-ahead
-# NOTE! It is not a terribly easy problem to place equi-distant points
+# NOTE: It is not a terribly easy problem to place equi-distant points
 # around a sphere or half-sphere. See:
 # http://www.math.niu.edu/~rusin/known-math/95/sphere.faq
 # ...for potential improvements in selecting normal bin centers
@@ -57,16 +63,14 @@ NORM_BIN_CENTERS = np.array([[-1, 0, 0],  # Cardinal directions
                              [1, 1, 1],
                              [1, -1, 1],
                              [0, 0, 1]])  # Straight ahead
-# The following value for DIST_BIN_EDGES comes out to:
-# (0,1.0000, 3.1623, 10.0000, 31.6228,np.inf), which is a reasonable
-# division of space
 # Note that the depth divisions will depend on the depth input. If absolute
 # depth is used, this scaling makes sense. If some measure of relative
 # depth in the scene is used, this makes much less sense (unless that
 # relative depth is scaled 0-100 or some such)
 N_BINS_DIST = 10
-DIST_BIN_EDGES = np.logspace(np.log10(1), np.log10(100), N_BINS_DIST)
-DIST_BIN_EDGES = np.hstack([0, DIST_BIN_EDGES(:-1), np.inf])
+MAX_DIST = 100
+DIST_BIN_EDGES = np.logspace(np.log10(1), np.log10(MAX_DIST), N_BINS_DIST)
+DIST_BIN_EDGES = np.hstack([0, DIST_BIN_EDGES[:-1], np.inf])
 
 
 def compute_distance_orientation_bins(normals,
@@ -111,7 +115,7 @@ def compute_distance_orientation_bins(normals,
     n_dist_bins = dist_bin_edges.shape[0] - 1
     # Normalize bin vectors
     L2norm = np.linalg.norm(norm_bin_centers, axis=1, ord=2)
-    norm_bin_centers = norm_bin_centers / L2norm
+    norm_bin_centers = norm_bin_centers / L2norm[:, np.newaxis]
 
     # Note, that the bin width for these bins will not be well-defined (or,
     # will not be uniform). For now, take the average min angle between bins
@@ -164,19 +168,23 @@ def compute_distance_orientation_bins(normals,
         for d_st, d_fin in zip(dist_bin_edges[:-1], dist_bin_edges[1:]):
             dIdx = (z >= d_st) & (z < d_fin)
             for ix in range(n_bins_x):
-                hIdx = (xx >= bins_x(ix)) & (xx < bins_x(ix+1))
+                hIdx = (xx >= bins_x[ix]) & (xx < bins_x[ix+1])
                 for iy in range(n_bins_y):
                     vIdx = (yy >= bins_y[iy]) & (yy < bins_y[iy + 1])
                     this_section = (dIdx & hIdx) & vIdx
-                    pct_pix_this_depth = np.mean(this_section)
+                    if this_section.sum()==0:
+                        output[iS, idx] = 0
+                        idx += n_norm_bins
+                        continue
                     if n_norm_bins > 1:
                         nn = n[this_section, :]
                         # Compute orientation of pixelwise surface normals relative
                         # to all normal bins
                         o = nn.dot(norm_bin_centers.T)
+                        print(o.shape)
                         #L2nn = np.linalg.norm(nn, axis=1, ord=2)
                         #o = bsxfun(@rdivide,o,Lb) # Norm of norm_bin_centers should be 1
-                        o /= np.linalg.norm(nn, axis=1, ord=2)
+                        o /= np.linalg.norm(nn, axis=1, ord=2)[:, np.newaxis]
                         if np.max(o-1) > 0.0001:
                             raise Exception('The magnitude of one of your normal bin vectors crossed with a stimulus normal is > 1 - Check on your stimulus / normal vectors!')
                         # Get rid of values barely > 1 to prevent imaginary output
@@ -197,7 +205,7 @@ def compute_distance_orientation_bins(normals,
                         # Special case: one single normal bin
                         # compute the fraction of screen pixels in this screen
                         # tile at this depth
-                        tmp_out = pct_pix_this_depth
+                        tmp_out = np.mean(this_section)
                     # Illegal for more than two bins of normals within the same
                     # depth / horiz/vert tile to be == 1
                     if sum(tmp_out == 1) > 1:
@@ -224,3 +232,97 @@ def compute_distance_orientation_bins(normals,
     params = dict()  # Fill me
     return output, params
 
+
+def tilt_slant(img, make_1d=False):
+    """Convert a pixelwise surface normal image into tilt, slant values
+
+    Parameters
+    ----------
+    nimg: array
+        Pixelwise normal image, [x,y,3] - 3rd dimension should represent 
+        the surface normal (x,y,z vector, summing to 1) at each pixel
+    """
+    sky = np.all(img==0, axis=2)
+    # Tilt
+    tau = np.arctan2(img[:,:,2], img[:,:,0])
+    # Slant
+    sig = np.arccos(img[:,:,1])
+    tau[sky] = np.nan
+    sig[sky] = np.nan
+    tau = utils.circ_dist(tau, -np.pi / 2) + np.pi
+    #tau = circ_dist(tau, np.pi) + np.pi
+    if make_1d:
+        tilt = tau[~np.isnan(tau)].flatilten()
+        slant = sig[~np.isnan(sig)].flatilten()
+        return tilt, slant
+    else:
+        return tau, sig
+
+
+def norm_color_image(nimg, cmap=RET, vmin_t=0, vmax_t=2 * np.pi,
+                    vmin_s=0, vmax_s=np.pi/2):
+    """Convert normal image to colormapped normal image"""
+    from matplotlib.colors import Normalize
+    tilt, slant = tilt_slant(nimg, make_1d=False)
+    # Normalize tilt (-pi to pi) -> (0, 1)
+    norm_t = Normalize(vmin=vmin_t, vmax=vmax_t, clip=True)
+    # Normalize slant (0 to pi/2) -> (0, 1)
+    norm_s = Normalize(vmin=vmin_s, vmax=vmax_s, clip=True)
+    # Convert normalized tilt to RGB color
+    tilt_rgb_orig = cmap(norm_t(tilt))
+    # Convert to HSV, replace saturation w/ normalized slant value
+    tilt_hsv = skcol.rgb2hsv(tilt_rgb_orig[...,:3])
+    tilt_hsv[:,:,1] = norm_s(slant)
+    # Convert back to RGB
+    tilt_rgb = skcol.hsv2rgb(tilt_hsv)
+    tilt_rgb = np.dstack([tilt_rgb, 1-np.isnan(slant).astype(np.float)])
+    # Compute better alpha
+    a_im = np.dstack([tilt_rgb_orig[...,:3], norm_s(slant)])
+    aa_im = tilt_rgb_orig[...,:3] * norm_s(slant)[..., np.newaxis] + np.ones_like(tilt_rgb_orig[...,:3]) * 0.5 * (1-norm_s(slant)[...,np.newaxis])
+    aa_im = np.dstack([aa_im, 1-np.isnan(tilt).astype(np.float)])
+    
+    return aa_im
+
+
+def tilt_slant_hist(tilt, slant, n_slant_bins = 30, n_tilt_bins = 90, do_log=True, 
+                    vmin=None, vmax=None, H=None, ax=None, **kwargs):
+    """Plot a polar histogram of tilt and slant values
+    
+    if H is None, computes & plots histogram of tilt & slant
+    if H is True, computes histogram of tilt & slant & returns histogram count
+    if H is a value, plots histogram of H"""
+    if (H is None) or (H is True) or (H is False):
+        return_h = H is True
+        tbins = np.linspace(0, 2*np.pi, n_tilt_bins)      # 0 to 360 in steps of 360/N.
+        sbins = np.linspace(0, np.pi/2, n_slant_bins) 
+        H, xedges, yedges = np.histogram2d(tilt, slant, bins=(tbins,sbins), normed=True) #, weights=pwr)
+        #H /= H.sum()
+        if do_log:
+            #print(H.shape)
+            H = np.log(H)
+            #H[np.isinf(H)] = np.nan
+        if return_h:
+            return H
+
+    if do_log:
+        if vmin is None:
+            vmin=-8
+        if vmax is None:
+            vmax = 4
+
+    e1 = n_tilt_bins * 1j
+    e2 = n_slant_bins * 1j
+
+    # Grid to plot your data on using pcolormesh
+    theta, r = np.mgrid[0:2*np.pi:e1, 0:np.pi/2:e2]
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(projection='polar'))
+    
+    pc = ax.pcolormesh(theta, r, H, vmin=vmin, vmax=vmax, **kwargs)
+    # Remove yticklabels, set limits
+    #ax.set_yticklabels([]) 
+    #ax.set_xticklabels([]) 
+    ax.set_ylim([0, np.pi/2])
+    ax.set_theta_offset(-np.pi/2)
+    if ax is None:
+        plt.colorbar(pc)
