@@ -155,10 +155,11 @@ def compute_distance_orientation_bins(normals,
 
     output = np.zeros((n_ims, n_dims)) * np.nan
     for iS in range(n_ims):
-        # if n_ims>200:
-        #     progressdot(iS,200,2000,n_ims)
-        # elif (n_ims < 200) and (n_ims > 1):
-        #     disp('computing Scene Depth Normals...')
+        if n_ims>200:
+            if iS % 200 == 0:
+                print("Done to image %d / %d"%(iS, n_ims)) #progressdot(iS,200,2000,n_ims)
+        elif (n_ims < 200) and (n_ims > 1):
+            disp('computing Scene Depth Normals...')
         # Pull single image for preprocessing
         z = distance[..., iS]  #S.(zVar)(:,:,iS)
         n = normals[..., iS]  # S.Normals(:,:,:,iS)
@@ -181,7 +182,7 @@ def compute_distance_orientation_bins(normals,
                         # Compute orientation of pixelwise surface normals relative
                         # to all normal bins
                         o = nn.dot(norm_bin_centers.T)
-                        print(o.shape)
+                        #print(o.shape)
                         #L2nn = np.linalg.norm(nn, axis=1, ord=2)
                         #o = bsxfun(@rdivide,o,Lb) # Norm of norm_bin_centers should be 1
                         o /= np.linalg.norm(nn, axis=1, ord=2)[:, np.newaxis]
