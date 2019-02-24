@@ -2,8 +2,12 @@
 
 __version__ = 0.02
 
-from . import alexnet_pyt
-from . import resnet_pyt
+try:
+    from . import alexnet_pyt
+    from . import resnet_pyt
+except ImportError:
+    print("No pytorch modules available.")
+
 from . import general
 from . import normals
 from . import motion_energy_aone
