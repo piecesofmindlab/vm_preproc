@@ -262,8 +262,8 @@ def tilt_slant(img, make_1d=False):
     tau = utils.circ_dist(tau, -np.pi / 2) + np.pi
     #tau = circ_dist(tau, np.pi) + np.pi
     if make_1d:
-        tilt = tau[~np.isnan(tau)].flatilten()
-        slant = sig[~np.isnan(sig)].flatilten()
+        tilt = tau[~np.isnan(tau)].flatten()
+        slant = sig[~np.isnan(sig)].flatten()
         return tilt, slant
     else:
         return tau, sig

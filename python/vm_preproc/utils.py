@@ -30,6 +30,7 @@ def norm_std_mean(S, mean=None, std=None, size_thresh=None):
     # Add optimization for huge matrices here
     return (S-mean)/std, mean, std
 
+
 def make_uniform(data, CDFres=1000, xdp=1):
     """Convert data to the probability of each data point assuming a uniform distribution.
     

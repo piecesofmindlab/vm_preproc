@@ -263,14 +263,11 @@ def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True):
     img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
     imc = img-1
     y, z, x = imc.T
-    rev_x = xflip
-    rev_y = yflip
-    rev_z = zflip
-    if rev_x: 
+    if xflip: 
         x = -x
-    if rev_y:
+    if yflip:
         y = -y
-    if rev_z:
+    if zflip:
         z = -z
     imc = np.dstack([x.T,y.T,z.T])
     if clip:
