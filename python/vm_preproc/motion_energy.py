@@ -199,7 +199,8 @@ def motion_energy(stimulus,
         
     # Make a list of gabor parameters
     if (gabor_params is None) or (phasemode == 5) or (phasemode == 7): 
-        if verbose, fprintf('Making a list of gabor parameters... \n'); :
+        if verbose:
+            fprintf('Making a list of gabor parameters... \n');
         # Added aspect ratio as necessary influence on Gabor parameters
 
 ###########################################
@@ -218,14 +219,16 @@ def motion_energy(stimulus,
 
     # Set up a matrix to fill in
     if show_or_preprocess:
-        if verbose, disp('Preprocessing...'); :
+        if verbose:
+            print('Preprocessing...')
         spreproc = zeros(stimxytsize(3), waveletchannelnum, 'single');
     else:
-        if verbose, disp('Making wavelets...'); :
+        if verbose:
+             print('Making wavelets...')
         if ~np.any(channel_index):
-            gnum = length(waveletchannelnum);
+            gnum = len(waveletchannelnum);
         else:
-            gnum = length(channel_index);
+            gnum = len(channel_index);
         
         gaborbank = zeros([patchxytsize gnum], 'single');
 
@@ -516,12 +519,12 @@ def get_gabor_parameters(
                 # HELL DOES/DID THAT COME IN? nowhere that I (ML) can find in
                 # Shinji's code. Must have been a hand-coded addition to
                 # make3dgabor_frames.
-                sampling_aspect_ratio = length(centers_x)/length(centers_y);
+                sampling_aspect_ratio = len(centers_x)/len(centers_y);
                 elong = aspect_ratio / sampling_aspect_ratio;
-                fprintf('AR=#.2f, sf=#.2f, g_sz_x=#.2f, nx=#d, g_sz_y=#.2f, ny=#d\n', aspect_ratio, sf, g_sz_x, length(cx), g_sz_y, length(cy));
+                fprintf('AR=#.2f, sf=#.2f, g_sz_x=#.2f, nx=#d, g_sz_y=#.2f, ny=#d\n', aspect_ratio, sf, g_sz_x, len(cx), g_sz_y, len(cy));
                 #keyboard;
                     
-            thisnumdirs = length(dir_array);
+            thisnumdirs = len(dir_array);
             if tf == 0 || direction_selective == 0:
                 thisnumdirs = ceil(thisnumdirs/2);  # use only ~180 deg
             
