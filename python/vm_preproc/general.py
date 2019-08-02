@@ -16,7 +16,7 @@ def convert_color(S, conversion='rgb2lab', keep_colors=False, **kwargs):
     Parameters
     ----------
     S : 
-    
+
     Notes
     -----
     Could probably use some more intelligent memory management
@@ -75,8 +75,8 @@ def output_nonlinearity(S, method='log', **kwargs):
         return params
 
     if method in ('log', 'logmean', 'logstd'):
-        # For log, d is a small value to add to assure no -Inf channels.
-        d = kwargs['delta'] if 'delta' in kwargs else 1e-5
+        # For log, delta is a small value to add to assure no -Inf channels.
+        delta = kwargs['delta'] if 'delta' in kwargs else 1e-5
         spreproc = np.log(S + delta)
         if method == 'logstd':
             std = kwargs['std'] if 'std' in kwargs else np.nanstd(S, axis=0)
