@@ -2,7 +2,36 @@
 from __future__ import division
 
 import numpy as np
+from skimage import color as skcol
 from .utils import make_uniform, norm_std_mean
+
+
+def convert_color(S, conversion='rgb2lab', keep_colors=False, **kwargs):
+    """Wholescale color conversion of (x, y, c, t) arrays
+    
+    Generally intended to convert RGB images to luminance images. 
+    Default conversion is to L*A*B colors space (discarding A and B
+    channels). 
+
+    Parameters
+    ----------
+    S : 
+    
+    Notes
+    -----
+    Could probably use some more intelligent memory management
+
+    """
+    try:
+        fn = getattr(skcol, conversion)
+    except AttributeError:
+        raise AttributeError('Unknown color function "%s" (not a function in skimage.color)'%conversion)
+    if keep_colors:
+        out = np.asarray([fn(s[:3].T, **kwargs).T for s in S.T]).T
+    else:
+        out = np.asarray([fn(s[:3].T, **kwargs)[..., 0].T for s in S.T]).T
+    params = dict(conversion=conversion, keep_colors=keep_colors, **kwargs)
+    return out, params
 
 # Output nonlinearities
 def output_nonlinearity(S, method='log', **kwargs):
