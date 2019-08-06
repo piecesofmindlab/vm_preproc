@@ -47,10 +47,11 @@ function varargout = preprocPipeline(S,ppSeq,Opts)
 dOpts.dbCache = false;
 dOpts.concat = false;
 dOpts.Is_Overwrite = false;
-dOpts.db = mlabSTRFdb;
+dOpts.db = [];
 dOpts.sDir = pwd; % Issue a warning about this? 
 dOpts.tmpDir = '.';
 dOpts.clusterOpts = []; % optional cluster parameters
+dOpts.do_deep_check = true;
 % Fill default options
 if ~exist('Opts','var')
     Opts = struct;
@@ -92,7 +93,7 @@ for iPP = 1:nSeqs
     % Create param struct for this pipeline
     params = preprocBuildPipeline(ppSeqs{iPP},Opts.dbCache,Opts.Is_Overwrite,Opts.concat);
     % Create preprocStep for first set, let it loose
-    ppStep = preprocStep(params.class,S,params,Opts.db,Opts.sDir,Opts.tmpDir);
+    ppStep = preprocStep(params.class,S,params,Opts.db,Opts.sDir,Opts.tmpDir, Opts.do_deep_check);
     [ppAll{iPP},pp{iPP}] = ppStep.run(Opts.clusterOpts);
 end
 

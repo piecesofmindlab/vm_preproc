@@ -110,10 +110,8 @@ clear img
 localstd = repmat(sqrt(abs(ifft2(fft2(mean(output,3).^2).*gf(:,:,1,:)))), [1 1 c 1]); 
 output = output./(.2+localstd);
 
-% Crop output to have same size than the input
+% Crop output to have same size as the input
 output = output(w+1:sn-w, w+1:sm-w,:,:);
-
-
 
 function g = gistGabor(img, params)
 % 

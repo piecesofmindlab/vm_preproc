@@ -14,12 +14,9 @@ switch Arg
         params.tfdivisions = 1; % number of tf channels, logarithmically spaced between min and max
         params.zerotf = true; % include zero tf ( =to Gaussian(?) mean of time points w/ no temporal modulation)
     case 2
-        error(['NOTE! This is obsolete, now same as 1 b/c of removal of '...
-             'normalization from preprocTF!']);
-        % No temporal freq channels; 1 freq at 0 tf for each frame; no
-        % normalization
+        % No temporal freq channels; 1 freq at 0 tf for each frame; 666 ms window
         % Temporal frequency channels
-        params.tsize = 1; % temporal window of gaussian, in frames (stim presented at 15 fps); SN uses 10 for motion energy
+        params.tsize = 10; % temporal window of gaussian, in frames (stim presented at 15 fps); SN uses 10 for motion energy
         params.tfmax = 0; % maximum temporal frequency encoded (tf is actually log10(params.tfmax)
         params.tfmin = 0; % minimum temporal frequency encoded (tf is actually log10(params.tfmin)
         params.tfdivisions = 1; % number of tf channels, logarithmically spaced between min and max

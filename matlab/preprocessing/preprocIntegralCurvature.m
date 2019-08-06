@@ -24,7 +24,7 @@ if ~exist('params','var')
 end
 % Default params
 dParams.scale = [8,16]; % gives 15x15, 7x7 grid of locations
-dParams.curvMethod = 'optimizedforloop'; % [Change 'forLoop' it sucks] 'conv'
+dParams.curvMethod = 'forloop'; % [Change 'forLoop' it sucks] 'conv'
 dParams.mergeObjects = 'last'; % 'first'; 'last'; 'none';
 dParams.Is_FillHoles = true;
 dParams.blur = 'gaussian';

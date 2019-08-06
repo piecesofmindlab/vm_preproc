@@ -22,6 +22,14 @@ for iIm = length(imlist)
     im(:,:,:,iIm) = imresize(imtmp,sz);
 end
 
+%% if starting with other images (not running the above two cells)
+load ../../../5e27feec42904bdcaba4aa3ac564cdd7.mat
+im = S;
+% addpath('../')
+% addpath('../preprocessing')
+% addpath('../utils')
+% addpath('../wrappers')
+
 %% Color space preprocessing
 % For all preprocessing functions, enumerated pre-set parameter sets are
 % stored in <preprocFunctionName>_getMetaParams.m The meanings of each
@@ -33,8 +41,17 @@ cparams = preprocColorSpace_GetMetaParams(1);
 
 %% Gabor wavelet preprocessing
 % Shinji's main set of parameters for
-gparams = preprocWavelets_grid_GetMetaParams(2);
-[Spp,gparams] = preprocWavelets_grid(Spp,gparams);
+gwparams = preprocWavelets_grid_GetMetaParams(6);
+gwparams.show_or_preprocess = 0; % generate raw gabors, don't preprocess stims
+[Spp,gwparams] = preprocWavelets_grid(rand(96,96,30),gwparams);
+
+gwparams2 = preprocWavelets_grid_GetMetaParams(201);
+[Spp2,gwparams2] = preprocWavelets_grid(rand(96,96,30),gwparams2);
+
+gwparams3 = preprocWavelets_grid_GetMetaParams(202);
+[Spp3,gwparams3] = preprocWavelets_grid(rand(96,96,30),gwparams3);
+
+showGabors({Spp, Spp2, Spp3},{gwparams,gwparams2,gwparams3})
 
 %% Compressive nonlinearity (log)
 nlparams = preprocNonLinearOut_GetMetaParams(1);
@@ -56,14 +73,17 @@ zparams = preprocNormalize_GetMetaParams(3);
 % (which requires some other code). I have been meaning to clean this up a
 % little; haven't yet. 
 %S = Stimulus(im); % These can also be loaded from a database
-%[Spp,params] = preprocPipeline(S,{'preprocColorSpace',1,'preprocWavelets_grid',2,'preprocNonLinearOut',1,'preprocDownsample',1,'preprocNormalize',3});
-
+load ../../../5e27feec42904bdcaba4aa3ac564cdd7.mat
+im = S;
+[Spp_w,wparams] = preprocPipeline(S,{'preprocColorSpace',1,'preprocWavelets_grid',6,'preprocNonLinearOut',1,'preprocNormalize',3});
+%% now do the gist model
+[Spp_g,gparams] = preprocPipeline(S,{'preprocColorSpace',1,'preprocGist',1,'preprocNonLinearOut',1,'preprocDownsample',1,'preprocNormalize',3});
 % Context for Gabor model:
 %% make a single Gabor
-channel = 122; % Pick a random channel out of all 6,555 possible channels
-[g1,g2] = make3dgabor([128,128,10],gparams.gaborparams(channel,:));
+%channel = 122; % Pick a random channel out of all 6,555 possible channels
+%[g1,g2] = make3dgabor([128,128,10],gparams.gaborparams(channel,:));
 % The two wavelets returned will be in quadrature phase (they will have a 90º phase offset)
 %% Make ALL the Gabor filters used for a given model:
 gparams.show_or_preprocess = 0;
-[gabors,~] = preprocWavelets_grid(ones(128,128,10),gparams);
+[gabors,~] = preprocWavelets_grid(rand(96,96,30),gparams);
 % Result will be X x Y x Time x gabor channel

@@ -68,7 +68,7 @@ rho = rho/params.screen_degrees;
 theta=theta/pi*180;
 % Mirror top / bottom of image (for symmetrical parts of fft)
 theta(theta>0) = 180-theta(theta>0);
-% Rotate 90º so 0º corresponds to horizontal orientations in Fourier space
+% Rotate 90ï¿½ so 0ï¿½ corresponds to horizontal orientations in Fourier space
 theta = abs(imrotate(theta,90));
 
 % Fourier transform of stimulus
@@ -90,15 +90,20 @@ if params.normalize_by_image
             gm = nanmean(Sf,1);
             gs = nanstd(Sf,[],1);
             Sf = bsxfun(@minus,Sf,gm);
+            gs(gs==0) = inf; % Avoid /0
             Sf = bsxfun(@rdivide,Sf,gs);
             contrast = gm;
         case 'L2'
             L2 = nansum(Sf.^2,1).^0.5;
-            Sf = bsxfun(@rdivide,Sf,L2);
+            L2n = L2;
+            L2n(L2n==0) = inf; % Avoid /0
+            Sf = bsxfun(@rdivide,Sf,L2n);
             contrast = L2;
         case 'L1'
             L1 = nanmax(Sf,[],1);
-            Sf = bsxfun(@rdivide,Sf,L1);
+            L1n = L1;
+            L1n(L1n==0) = inf; % Avoid /0
+            Sf = bsxfun(@rdivide,Sf,L1n);
             contrast = L1;
         case 'demean'
             gm = nanmean(Sf,1);
