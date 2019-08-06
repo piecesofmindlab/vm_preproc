@@ -14,7 +14,7 @@ from PIL import Image
 import numpy as np
 import torch
 
-from buffer_list import BufferList
+from .buffer_list import BufferList
 
 ##############################
 # Helper functions
