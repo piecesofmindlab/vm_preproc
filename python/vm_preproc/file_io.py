@@ -1,6 +1,9 @@
 # Imports
 
 import numpy as np
+import os
+import tqdm
+import subprocess
 from PIL import Image
 try:
     from torch.utils.data import Dataset, DataLoader
@@ -282,6 +285,96 @@ def load_exr_zdepth(fname, thresh=1000):
     z[z > thresh] = np.nan
     return z
 
+def save_movie(fname, array, fps=30, crf=0, preset='fast', codec='libx264', color_format='rgb24', is_verbose=False):
+    """Save array of images as an mp4 movie"""
+    ff = VideoEncoderFFMPEG(fname, array.shape[:2], fps=fps, color_format=color_format, 
+                            codec=codec, preset=preset, crf=crf, is_verbose=is_verbose)
+    ff.write(array)
+    ff.stop()
+
+class VideoEncoderFFMPEG(object):
+    """ Base class for encoder interfaces. """
+
+    def __init__(self, fname, resolution, fps, color_format='rgb24', codec='libx264', preset='fast', crf=0, is_verbose=False):
+        """ Constructor.
+
+        Parameters
+        ----------
+        fname: str
+            File name for movie to be written.
+        resolution: tuple, len 2
+            Desired (horizontal, vertical) resolution.
+        fps: int
+            Desired refresh rate.
+        color_format: str, default 'rgb24'
+            The target color format. Set to 'gray' grayscale
+        codec: str, default 'libx264'
+            The desired video codec.
+        """
+        self.fname = fname
+        if os.path.exists(self.fname):
+            os.remove(self.fname)
+        self.resolution = resolution
+        self.fps = fps
+        self.color_format = color_format
+        self.codec = codec
+        self.preset = preset
+        self.crf = crf
+        self.is_verbose = is_verbose
+        # Business
+        ffmpeg_cmd = self._get_ffmpeg_cmd()
+        if is_verbose:
+            print('FFMPEG_cmd:', ffmpeg_cmd)
+        self.video_writer = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+
+    def _get_ffmpeg_cmd(self):
+        """ Get the FFMPEG command to start the sub-process. """
+        size = '{}x{}'.format(self.resolution[1], self.resolution[0])
+        print('size: ', size)
+        if self.preset is None:
+            return ['ffmpeg',
+                    # -- Input -- #
+                    '-an',  # no audio
+                    '-r', str(self.fps),  # fps
+                    '-f', 'rawvideo',  # format
+                    '-s', size,  # resolution
+                    '-pix_fmt', self.color_format,  # color format
+                    '-i', 'pipe:',  # piped to stdin
+                    # -- Output -- #
+                    '-c:v', codec,  # video codec
+                    self.fname]
+        else:
+            return ['ffmpeg', '-hide_banner', '-loglevel', 'error',
+                    # -- Input -- #
+                    '-an',  # no audio
+                    '-r', str(self.fps),  # fps
+                    '-f', 'rawvideo',  # format
+                    '-s', size,  # resolution
+                    '-pix_fmt', self.color_format,  # color format
+                    '-i', 'pipe:',  # piped to stdin
+                    '-preset', self.preset,
+                    '-crf', str(self.crf),
+                    # -- Output -- #
+                    '-c:v', self.codec,  # video codec
+                    self.fname]
+
+    def write(self, img):
+        """ Write a frame to disk.
+
+        Parameters
+        ----------
+        img : array_like
+            The input frame or frames. To write multiple frames, array should be 
+            [y, x, color, time]
+        """
+        if np.ndim(img) == 4:
+            for img_ in tqdm.tqdm(img.T):
+                self.write(img_.T)
+            return
+        self.video_writer.stdin.write(img.tostring())
+    
+    def stop(self):
+        self.video_writer.stdin.close()
 
 # Stubs. Good ideas, from https://discuss.pytorch.org/t/use-of-dataset-class/1620/4
 # class MergedDataset(Dataset):
