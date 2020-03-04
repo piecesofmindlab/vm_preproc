@@ -13,8 +13,12 @@ import time
 from . import file_io as fio
 
 ### --- Base AlexNet model --- ###
-# This is a memory hog at load time; consider commenting out and loading in functions below
-alexnet_model = pytmodels.alexnet(pretrained=True)
+try:
+    # This is a memory hog at load time; consider commenting out and loading in functions below
+    alexnet_model = pytmodels.alexnet(pretrained=True)
+except:
+    print("Alexnet not loaded from pytorch for whatever reason")
+    alexnet_model = None
 
 class AlexNetLayer(nn.Module):
     """Allows feature output from different layers of Alexnet"""

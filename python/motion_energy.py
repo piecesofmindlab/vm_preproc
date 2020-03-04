@@ -241,13 +241,13 @@ def motion_energy(stimulus,
     maskenv_below = 0.1; # spatial envelope < maskenv_below x stimulus size
 
     if gaborcachemode==1:
-        gaborcache = zeros([2, prod(patchxytsize(1:2)), waveletchannelnum], 'single');
-        gtwcache = zeros([2, t_size, waveletchannelnum], 'single');
+        gaborcache = zeros([2 prod(patchxytsize(1:2)) waveletchannelnum], 'single');
+        gtwcache = zeros([2 t_size waveletchannelnum], 'single');
 
 
-    lastgparam = zeros((9, 1));
+    lastgparam = zeros(9, 1);
     wcount = 0;
-    for ii in len(waveletchannelnum):
+    for ii=1:waveletchannelnum
         
         if np.any(channel_index) && ~np.any(ii==channel_index):
             continue
