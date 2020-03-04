@@ -73,4 +73,83 @@ def preproc_pipeline(input, preproc_steps, dbi=None, cluster_args=None):
         processed) or a dict (of multiple databse ids or multiple arrays for different
         named inputs)
 
+
+def video_batch(fn, input, batch_size, output_file=None, kwargs):
+    """Cycle through a file too long to load into memory at once
+    Note: this will be inefficient without parallelization.
+
+    """
+    # Get full n frames of video, from video module
+    vid = video(blah)
+    n_frames = vid.n_frames
+    n_batches = int(np.ceil(n_frames / batch_size))
+
+    if output_file is not None:
+        # initialize video writer object
+        videoWriter(output_file) 
+    for ibatch in range(n_batches):
+        st = ibatch * batch_size
+        fin = np.min([(ibatch + 1) * batch_size, n_frames])
+        stim = load_video(input, st, fin)
+        out = fn(stim, **kwargs)
+        if output_option=='video':
+            #write video
+            pass
+        else:
+            #concatenate results as array
+            pass
+    if output_file is None:
+        return output
+
+
 '''
+
+"""
+Class to join multiple types of stimulus information for the same stimulus into one object for preprocessing
+
+Case study: 
+
+Surface normals, Surface distance, and camera angle for Scene Depth & Normal model
+
+"""
+
+
+# inherit from Stimulus class
+class MultiFacetStimulus(object):
+
+class ArgSet(object):
+    """dict of parameters to pass to a function.
+    """
+    # must have one entry like:
+    fn = vm_preproc.generic.downsample # i.e., these args are for this function
+    tag = downsample_defaultoptions # function name (within module or whatever) + meaningful whatever
+    maybe include _data_fields for what to be stored? deleteme_
+
+class PreprocStep(fn, input, kwargs):
+    """
+    Parameters
+    ----------
+    input : Stimulus, MultiFacetStimulus, MultiPartStimulus, or FeatureSpace
+
+    kwargs : make an argset? dict entry saved in database w/ a formulaic tag to make it easy to grab? 
+    """
+
+    fn = import(fn) # get function, probably from vm_preproc, or however this needs to work
+
+    def run(self, ):
+        # Call the function
+        # MultiFacetStimulus must contain a dict that maps to input kwargs for fn.
+        s = input.load()
+        if isinstance(s, dict):
+            kwargs.update(s)
+            out = fn(**kwargs)
+        else:
+            out = fn(s, **kwargs)
+        return out
+
+    def save(self, output):
+        # Save FeatureSpace output. 
+        pass
+
+
+class PreprocPipeline()

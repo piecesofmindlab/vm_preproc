@@ -22,7 +22,7 @@ except:
 
 class AlexNetLayer(nn.Module):
     """Allows feature output from different layers of Alexnet"""
-    def __init__(self, layer, base_network=alexnet_model): # base_network=None
+    def __init__(self, layer, base_network=None): # base_network=alexnet_model
         """
         Parameters
         ----------
@@ -97,7 +97,7 @@ def run_cnn(ims, model, image_transform=None,
     data_loader = fio.DataLoader(ds, batch_size=50, shuffle=False, num_workers=num_workers)
     # Get nn model
     if model is None:
-        model = alexnet_model
+        model = pytmodels.alexnet(pretrained=True) #alexnet_model
     # Graphics card or no
     if use_gpu:
         model = model.cuda()
