@@ -104,3 +104,41 @@ def circ_dist(a, b):
     phi = np.e**(1j*a) / np.e**(1j*b)
     ang_dist = np.arctan2(phi.imag, phi.real)
     return ang_dist
+
+
+def alpha_overlay(im0, im1, alpha, center=(0,0)):
+    """overlay im1 over im0 with alpha blending defined by alpha
+    
+    Parameters
+    ----------
+    im0 : array
+        underlay image
+    im1 : array
+        overlay image
+    center : tuple
+        (x, y) coords, in pixels from center of image, for where to 
+        center the overlay image
+    """    
+    
+    if np.ndim(im1) == 2:
+        y0, x0 = im0.shape
+        y1, x1 = im1.shape
+    elif np.ndim(im1) == 3:
+        y0, x0, c0 = im0.shape
+        y1, x1, c1 = im1.shape
+        alpha = np.atleast_3d(alpha)
+    if (x1 != x0) or (y1 != y0):
+        # By convention, add any rounded pixels to left and top
+        left = np.ceil((x0 - x1) / 2 + center[0]).astype(np.int)
+        right = np.floor((x0 - x1) / 2 - center[0]).astype(np.int)
+        top = np.ceil((y0 - y1) / 2 - center[1]).astype(np.int)
+        bottom = np.floor((y0 - y1) / 2 + center[1]).astype(np.int)
+        # Will generate errors with overflow; fix? just let it generate errors for now.
+        if np.ndim(im1) == 2:
+            im1 = np.pad(im1, [(top, bottom), (left, right)])
+            alpha = np.pad(alpha, [(top, bottom), (left, right)])
+        elif np.ndim(im1) == 3:
+            im1 = np.pad(im1, [(top, bottom), (left, right), (0, 0)])
+            alpha = np.pad(alpha, [(top, bottom), (left, right), (0, 0)])
+    out = im0 * (1-alpha) + im1 * (alpha)
+    return out.astype(im0.dtype)
