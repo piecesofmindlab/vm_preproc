@@ -5,7 +5,6 @@ import numpy as np
 from skimage import color as skcol
 from .utils import make_uniform, norm_std_mean
 
-
 def convert_color(S, conversion='rgb2lab', keep_colors=False, **kwargs):
     """Wholescale color conversion of (x, y, c, t) arrays
     
@@ -33,7 +32,7 @@ def convert_color(S, conversion='rgb2lab', keep_colors=False, **kwargs):
     params = dict(conversion=conversion, keep_colors=keep_colors, **kwargs)
     return out, params
 
-# Output nonlinearities
+
 def output_nonlinearity(S, method='log', **kwargs):
     """Output nonlinearity on each channel of a model. 
 
@@ -99,6 +98,7 @@ def output_nonlinearity(S, method='log', **kwargs):
     params['n_channels'] = spreproc.shape[1]
 
     return spreproc, params
+
 
 def normalize(S, method='zscore', crop=None, reduce_channels=None, valid_channels=None,
     **kwargs):

@@ -1,7 +1,7 @@
 # Utility functions
 import numpy as np
 from scipy.interpolate import interp1d
-
+from . import file_io
 
 ### --- Stats functions --- ###
 def norm_std_mean(S, mean=None, std=None, size_thresh=None):
@@ -28,7 +28,7 @@ def norm_std_mean(S, mean=None, std=None, size_thresh=None):
     if std is None:
         std = S.std(0)
     # Add optimization for huge matrices here
-    return (S-mean)/std, mean, std
+    return (S - mean) / std, mean, std
 
 
 def make_uniform(data, CDFres=1000, xdp=1):
@@ -142,3 +142,23 @@ def alpha_overlay(im0, im1, alpha, center=(0,0)):
             alpha = np.pad(alpha, [(top, bottom), (left, right), (0, 0)])
     out = im0 * (1-alpha) + im1 * (alpha)
     return out.astype(im0.dtype)
+
+# Stub. WIP.
+# def batch_run(fn, fname, batch_size, full_size, var_name=None, overlap=0, axis=0, **kwargs):
+#     """Run a preprocessing function in batches over a large stimulus"""
+#     # Lazy load for now:
+#     from vm_tools.file_io import load_array
+#     n_frames = file_io.get_array_size(fname, var_name=var_name, axis=axis)
+#     n_batches = int(np.ceil(n_frames / (batch_size + overlap * 2)))
+#     batch_edges = np.arange(0, n_frames, batch_size)
+
+#     for i, (st, fin) in enumerate(zip(starts, ends)):
+#         data = file_io.load_batch(fname, st, fin)
+
+#         tmp = fn(data, **kwargs)
+#         if i==0:
+#             # preallocate output variable
+#             output = None
+
+#         else:
+#             # Add to variable
