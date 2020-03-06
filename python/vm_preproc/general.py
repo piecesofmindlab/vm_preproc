@@ -234,3 +234,13 @@ def downsample(S, method='box', input_hz=None, output_hz=None,
     # Done
     return S, params
 
+# Consider adding to downsample function above
+# def downsample_uneven_frames(data, nframes=30):
+#     n = data.shape[0]
+#     extra_frames = n % nframes
+#     print(extra_frames)
+#     n = n // nframes * nframes
+#     trs = vmt.utils.downsample(data[:n], nframes)
+#     if extra_frames > 3:
+#         trs = np.vstack([trs, np.mean(data[-extra_frames:], axis=0)])
+#     return trs
