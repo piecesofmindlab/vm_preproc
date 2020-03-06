@@ -5,6 +5,7 @@ import os
 import tqdm
 import subprocess
 from PIL import Image
+import image_io
 try:
     from torch.utils.data import Dataset, DataLoader
     from torchvision import transforms
@@ -259,6 +260,7 @@ if torch_available:
         def __len__(self):
             return len(self.total_count)
 
+
 def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True):
     """Load an exr (floating point) image to surface normal array
 
@@ -285,12 +287,14 @@ def load_exr_zdepth(fname, thresh=1000):
     z[z > thresh] = np.nan
     return z
 
+
 def save_movie(fname, array, fps=30, crf=0, preset='fast', codec='libx264', color_format='rgb24', is_verbose=False):
     """Save array of images as an mp4 movie"""
     ff = VideoEncoderFFMPEG(fname, array.shape[:2], fps=fps, color_format=color_format, 
                             codec=codec, preset=preset, crf=crf, is_verbose=is_verbose)
     ff.write(array)
     ff.stop()
+
 
 class VideoEncoderFFMPEG(object):
     """ Base class for encoder interfaces. """
@@ -375,6 +379,12 @@ class VideoEncoderFFMPEG(object):
     
     def stop(self):
         self.video_writer.stdin.close()
+
+
+def get_array_size(fname, axis=0):
+    """Get total number of frames (or other quantity) in file"""
+    pass
+
 
 # Stubs. Good ideas, from https://discuss.pytorch.org/t/use-of-dataset-class/1620/4
 # class MergedDataset(Dataset):
