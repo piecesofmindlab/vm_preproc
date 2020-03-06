@@ -261,7 +261,7 @@ if torch_available:
             return len(self.total_count)
 
 
-def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True):
+def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True, zero_norm_to_nan=False):
     """Load an exr (floating point) image to surface normal array
 
     """
@@ -277,6 +277,8 @@ def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True):
     imc = np.dstack([x.T,y.T,z.T])
     if clip:
         imc = np.clip(imc, -1, 1)
+    if zero_norm_to_nan:
+        pass
     return imc
 
 
