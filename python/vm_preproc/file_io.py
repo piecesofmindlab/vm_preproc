@@ -5,7 +5,7 @@ import os
 import tqdm
 import subprocess
 from PIL import Image
-import image_io
+import imageio
 try:
     from torch.utils.data import Dataset, DataLoader
     from torchvision import transforms

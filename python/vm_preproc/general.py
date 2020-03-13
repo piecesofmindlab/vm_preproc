@@ -189,7 +189,12 @@ def normalize(S, method='zscore', crop=None, reduce_channels=None, valid_channel
 def downsample(S, method='box', input_hz=None, output_hz=None, 
                        frameshifts=None, **kwargs):
     """
-    for method='gauss', specify sigma, units == ????? IDKWTF
+    for method 'gauss', specify sigma, units == ????? IDKWTF
+    for method 'box', you can specify kwarg `extra_frame_threshold`. If the 
+    number of frames doesn't divide evenly into bins, this resolves the 
+    ambiguity for what to do with the extra bins: if there are more than 
+    `extra_frame_threshold` time points left, they get an extra value at the 
+    end of the timecourse.
 
     TODO: 
     implement scipy.interpolate methods for cubic / lanczos etc downsampling
@@ -213,13 +218,23 @@ def downsample(S, method='box', input_hz=None, output_hz=None,
             print('shifting %d frames...'%frameshifts)
             # FIX ME, this is non-functional old matlab-ish code
             S = circshift(S,[frameshifts, 0])
-        tframes = S.shape[0] // fr_per_sample * fr_per_sample
+        n = S.shape[0]
+        tframes = n // fr_per_sample * fr_per_sample
+        extra_frames = n % fr_per_sample
         # Reshape to put samples over which to downsample along 2nd axis
         # (2nd, w/ 0-based indexing = 1)
+        extra = S[tframes:]
         S = np.reshape(S[:tframes], (-1, fr_per_sample) + S.shape[1:])
         # Take mean, max, etc
         fn = dict(box=np.mean, max=np.max, min=np.min)[method]
         S = fn(S, axis=1)
+        if 'extra_frame_threshold' in kwargs:
+            print("DOING IT: extra frames = %d"%extra_frames)
+            if extra_frames > kwargs['extra_frame_threshold']:
+                print(extra.shape)
+                print(S.shape)
+                S = np.vstack([S, fn(extra, axis=0)])
+                print(S.shape)
     elif method == 'gauss':
         # Smooth and downsample
         sigma = kwargs['sigma'] if 'sigma' in kwargs else None
