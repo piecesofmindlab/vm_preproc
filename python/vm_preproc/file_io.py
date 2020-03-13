@@ -12,7 +12,7 @@ try:
     torch_available = True
 except:
     torch_available = False
-import cv2
+import cv3
 
 
 # Misc functions
@@ -265,7 +265,7 @@ def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True, zero_
     """Load an exr (floating point) image to surface normal array
 
     """
-    img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
+    img = cv3.imread(fname, cv3.IMREAD_UNCHANGED)
     imc = img-1
     y, z, x = imc.T
     if xflip: 
@@ -284,7 +284,7 @@ def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True, zero_
 
 def load_exr_zdepth(fname, thresh=1000):
     """Load an exr (floating point) image to absolute distance array"""
-    img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
+    img = cv3.imread(fname, cv3.IMREAD_UNCHANGED)
     z = img[..., 0]
     z[z > thresh] = np.nan
     return z

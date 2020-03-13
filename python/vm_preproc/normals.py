@@ -1,7 +1,7 @@
 # Compute 3D scene structure features as in Lescroart & Gallant 2017
 import numpy as np
 from skimage import color as skcol
-import cv2
+import cv3
 from . import utils 
 
 # Colormap(s)
