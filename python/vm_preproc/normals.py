@@ -1,7 +1,11 @@
 # Compute 3D scene structure features as in Lescroart & Gallant 2017
 import numpy as np
 from skimage import color as skcol
-import cv3
+try:
+    import cv2 as cv
+except:
+    print("cv2 import failed; attempting to import cv3!")
+    import cv3 as cv
 from . import utils 
 
 # Colormap(s)
@@ -164,7 +168,7 @@ def compute_distance_orientation_bins(normals,
             if iS % 200 == 0:
                 print("Done to image %d / %d"%(iS, n_ims)) #progressdot(iS,200,2000,n_ims)
         elif (n_ims < 200) and (n_ims > 1):
-            disp('computing Scene Depth Normals...')
+            print('computing Scene Depth Normals...')
         # Pull single image for preprocessing
         z = distance[..., iS]  #S.(zVar)(:,:,iS)
         n = normals[..., iS]  # S.Normals(:,:,:,iS)
@@ -227,9 +231,9 @@ def compute_distance_orientation_bins(normals,
                     idx += n_norm_bins
         # Do sky channel(s) after last depth channel, add (n tiles) sky channels
         if sky_channel and (np.max(dist_bin_edges) < np.inf):
-            dSky = z >= dist_bin_edges(-1)
-            skyidx = np.arange((n_dims - n_tiles + 1), n_dims)
-            tmp = np.zeros(n_bins_y, n_bins_x)
+            dSky = z >= dist_bin_edges[-1]
+            skyidx = np.arange((n_dims - n_tiles), n_dims)
+            tmp = np.zeros((n_bins_y, n_bins_x))
             for x_st, x_fin in zip(bins_x[:-1], bins_x[1:]):
                 hIdx = (xx >= x_st) & (xx < x_fin)
                 for y_st, y_fin in zip(bins_y[:-1], bins_y[1:]):
