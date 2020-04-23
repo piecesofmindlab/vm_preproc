@@ -1,12 +1,12 @@
 import os
+import appdirs
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-from . import appdirs
 
 cwd = os.path.dirname(__file__)
-userdir = appdirs.user_data_dir("vm_preproc", appauthor="MarkLescroart")
+userdir = appdirs.user_config_dir("vm_preproc", appauthor="MarkLescroart")
 usercfg = os.path.join(userdir, "options.cfg")
 
 config = configparser.ConfigParser()

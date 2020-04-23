@@ -20,9 +20,9 @@ from .buffer_list import BufferList
 # Helper functions
 ##############################
 
-#from .motion_energy_aone import imagearr2luminance
-#from .motion_energy_aone import resize_image
-#from .motion_energy_aone import load_image_luminance
+#from .motion_energy_cpu_aone import imagearr2luminance
+#from .motion_energy_cpu_aone import resize_image
+#from .motion_energy_cpu_aone import load_image_luminance
 
 
 
@@ -95,6 +95,7 @@ def compute_filter_responses(stimulus,
                              quadrature_combination=_sqrt_sum_squares,
                              output_nonlinearity=_log_compress,
                              use_cuda=True,
+                             dozscore=False, # non-functional, just for equivalence
                              **moten_pyramid_parameters):
     """Compute the motion-energy filters' response to the stimuli.
 
@@ -130,6 +131,8 @@ def compute_filter_responses(stimulus,
     """
     _, vdim, hdim = stimulus.shape
     aspect_ratio = moten_pyramid_parameters.get('aspect_ratio', hdim/float(vdim))
+    if 'aspect_ratio' not in moten_pyramid_parameters:
+        moten_pyramid_parameters['aspect_ratio'] = aspect_ratio
     stimulus = stimulus.reshape(stimulus.shape[0], -1)
 
     stimulus = torch.from_numpy(stimulus.astype('float32'))
@@ -141,7 +144,6 @@ def compute_filter_responses(stimulus,
 
     gabor_parameters = mk_moten_pyramid_params(stimulus_fps,
                                                gabor_temporal_window,
-                                               aspect_ratio=aspect_ratio,
                                                **moten_pyramid_parameters)
 
     channels = []
@@ -170,14 +172,14 @@ def compute_filter_responses(stimulus,
     return channels
 
 
-from .motion_energy_aone import mk_spatiotemporal_gabor
-from .motion_energy_aone import mk_moten_pyramid_params
+from .motion_energy_cpu import mk_spatiotemporal_gabor
+from .motion_energy_cpu import mk_moten_pyramid_params
 
 ##############################
 # core functionality
 ##############################
 
-from .motion_energy_aone import mk_3d_gabor
+from .motion_energy_cpu import mk_3d_gabor
 from numbers import Number
 
 def dotspatial_frames(spatial_gabor_sin, spatial_gabor_cos,

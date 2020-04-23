@@ -6,11 +6,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torchvision import models as pytmodels
-
+import file_io as fio
 import time
-
-# Module-ify me
-from . import file_io as fio
 
 
 def get_layer(ims, layers=('maxpool',), model=None, image_transform=None, 

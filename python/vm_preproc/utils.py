@@ -1,7 +1,12 @@
 # Utility functions
+import os
+import six
+import h5py
+import inspect
+import file_io
 import numpy as np
 from scipy.interpolate import interp1d
-from . import file_io
+
 
 ### --- Stats functions --- ###
 def norm_std_mean(S, mean=None, std=None, size_thresh=None):
@@ -99,7 +104,7 @@ def ensure_monotonic(x):
 
 
 def circ_dist(a, b):
-    """Angle between two angles
+    """Angle between two angles, all in radians
     """
     phi = np.e**(1j*a) / np.e**(1j*b)
     ang_dist = np.arctan2(phi.imag, phi.real)
@@ -143,22 +148,170 @@ def alpha_overlay(im0, im1, alpha, center=(0,0)):
     out = im0 * (1-alpha) + im1 * (alpha)
     return out.astype(im0.dtype)
 
-# Stub. WIP.
-# def batch_run(fn, fname, batch_size, full_size, var_name=None, overlap=0, axis=0, **kwargs):
-#     """Run a preprocessing function in batches over a large stimulus"""
-#     # Lazy load for now:
-#     from vm_tools.file_io import load_array
-#     n_frames = file_io.get_array_size(fname, var_name=var_name, axis=axis)
-#     n_batches = int(np.ceil(n_frames / (batch_size + overlap * 2)))
-#     batch_edges = np.arange(0, n_frames, batch_size)
 
-#     for i, (st, fin) in enumerate(zip(starts, ends)):
-#         data = file_io.load_batch(fname, st, fin)
+def get_default_kwargs(fn):
+    """Get keyword arguments and default values for a function
 
-#         tmp = fn(data, **kwargs)
-#         if i==0:
-#             # preallocate output variable
-#             output = None
+    Uses `inspect` module; this is a thin convenience wrapper
 
-#         else:
-#             # Add to variable
+    Parameters
+    ----------
+    fn : function
+        function for which to get kws
+    """
+    kws = inspect.getargspec(fn)
+    defaults = dict(zip(kws.args[-len(kws.defaults):], kws.defaults))
+    return defaults
+    
+def get_function(function_name):
+    """Load a function to a variable by name
+
+    Parameters
+    ----------
+    function_name : str
+        string name for function (including module)
+    """
+    import importlib
+    fn_path = function_name.split('.')
+    module_name = '.'.join(fn_path[:-1])
+    fn_name = fn_path[-1]
+    module = importlib.import_module(module_name)
+    func = getattr(module, fn_name)
+    return func
+
+
+class DataSet(object):
+    """Loader for files"""
+    def __init__(self, fpath, variable_name='data', data=None):
+        """Parse whatever file you've got"""
+        # TODO: handle list of files, total file length
+        # Need to computer or specify n frames per file, store as property
+        self.fpath = fpath
+        self.variable_name = variable_name
+        self._n_frames = None
+        self._data = data
+
+    def load(self, variable_name=None, idx=None):
+        """Load data into memory"""
+        if self._data is None:
+            if variable_name is None:
+                variable_name = self.variable_name
+            return file_io.load_array(self.fpath, variable_name, idx=idx)
+        else: 
+            if idx is None:
+                return self._data
+            else:
+                return self._data[idx[0]:idx[1]]
+
+    @property
+    def n_frames(self):
+        """Compute how many frames across stimuli etc"""
+        if self._n_frames is None:
+            if self._data is None:
+                fnm, ext = os.path.splitext(self.fpath)
+                sz = file_io.var_size(self.fpath)
+                if ext in ('.mp4',):
+                    frames = sz[-1]
+                else:
+                    frames = sz[0]
+            else:
+                # Assume (y, x, [c], t) array
+                frames = self._data.shape[0]
+            self._n_frames = frames
+        return self._n_frames
+    
+
+def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='discard', **kwargs):
+    """Cycle through a file too long to load into memory at once
+    
+    Parameters
+    ----------
+    fn : function to call
+        if a string, then fn should be the full modular path to the 
+        function ()
+
+    Notes
+    -----
+    TO DO: parallelize
+    """
+    # Get function to call
+    if isinstance(fn, six.string_types):
+        fn = get_function(fn)
+    # Get full n frames of video, from video module
+    if not hasattr(inpt, 'load'):
+        if isinstance(inpt, six.string_types):
+            inpt = DataSet(inpt)
+        else:
+            inpt = DataSet(None, data=inpt)
+        #raise ValueError('`inpt` must be either a string filepath or a class with a load method')
+    n_frames = inpt.n_frames
+    if batch_size is None:
+        batch_size = n_frames
+    n_batches = int(np.ceil(n_frames / batch_size))
+    print('Running %d batches'%n_batches)
+    output_option = 'array'
+    if output_file is not None:
+        fnm, ext = os.path.splitext(output_file)
+        if ext in ('.mp4',):
+            # initialize video writer object
+            outpt = file_io.VideoEncoderFFMPEG(output_file) 
+            output_option = 'video'
+        elif ext in file_io.HDF_EXTENSIONS:
+            output_option = 'hdf'
+            outpt = h5py.File(output_file, mode='w')
+            # Create output variable dataset in hdf file?
+        else:
+            raise ValueError('Unsupported output type.')
+    else:
+        # TO DO: Preallocate...?
+        # outpt = np.array(n_frames)
+        outpt = []
+
+    try:
+        kws = get_default_kwargs(inpt.load)
+        for ibatch in range(n_batches):
+            st = ibatch * batch_size
+            fin = np.min([(ibatch + 1) * batch_size, n_frames])
+            idx = (st, fin)
+            if 'variable_name' in kws:
+                stim = inpt.load(idx=idx, variable_name=kws['variable_name'])
+            else:
+                stim = inpt.load(idx=idx)
+            # Function must return single array output for this to work
+            out = fn(stim, **kwargs)
+            if isinstance(out, tuple) and (len(out) > 1):
+                if multiple_outputs in (False, 'discard', None):
+                    # Keep only first output
+                    out = out[0]
+                else:
+                    raise NotImplementedError('Cannot yet handle multiple outputs from file')
+                    # Perhaps a handle_outputs() function here, e.g.
+                    # out, params_etc = handle_outputs(out)
+            if output_option=='video':
+                # Write video
+                for o_ in out:
+                    outpt.write(o_)
+            elif output_option=='hdf':
+                # Write hdf
+                if ibatch==0:
+                    # For first batch, create dataset
+                    dshape = (n_frames, *out.shape[1:])
+                    outpt.create_dataset('data', dtype=out.dtype, shape=dshape, compression='gzip')
+                outpt['data'][idx[0]:idx[1]] = out
+            else:
+                # Concatenate results as array
+                outpt.append(out)
+        if output_file is None:
+            return np.vstack(outpt)
+        else: 
+            if output_option=='hdf':
+                outpt.close()
+            elif output_option=='video':
+                outpt.stop()
+    except:
+        # Close output files
+        if output_option=='hdf':
+            outpt.close()
+        elif output_option=='video':
+            outpt.stop()
+        raise

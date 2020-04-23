@@ -1,570 +1,520 @@
-# Compute motion energy
-from __future__ import division
-import itertools as itools
+# Wrapper for motion energy code
 import numpy as np
-import time
+import matplotlib.pyplot as plt
+import file_io as fio
+from matplotlib import cm, colors, animation
+from matplotlib.collections import LineCollection
+from mpl_toolkits.axes_grid1 import ImageGrid
+# Soften dependency?
+# try:
+#     from mpl_toolkits.axes_grid1 import ImageGrid
+# except:
+#     print('no ImageGrid available for this computer!')
 
-def _make_gabor():
-    pass
+# Custom color maps
+from matplotlib.colors import LinearSegmentedColormap
+blue = (0, 0, 1.0)
+cyan = (0, 0.5, 1.0)
+white = (1.0, 0.85, 1.0)
+orange = (1.0, 0.5, 0)
+red = (1.0, 0, 0)
+color_cycle = [blue, cyan, white, orange, red]
+alpha_cycle_0 = (1.0, 0.625, 0.25, 0.625, 1.0)
+alpha_cycle_1 = (1.0, 0.5, 0.0, 0.5, 1.0)
+# blue, cyan, white, orange, red
+# (this is effectively a higher-contrast RdBu_r)
+bcwor = LinearSegmentedColormap.from_list('bcwor', color_cycle)
+bcwora = LinearSegmentedColormap.from_list('bcwora', [col + tuple([a]) for col, a in zip(color_cycle, alpha_cycle_0)])
+bcworaa = LinearSegmentedColormap.from_list('bcworaa', [col + tuple([a]) for col, a in zip(color_cycle, alpha_cycle_1)])
 
-def _define_filter_pyramid(spatial_freqs=(), 
-                           temporal_freqs=(0, 2, 4),
-                           orientations=(0, 45, 90, 135, 180, 225, 270, 315),
-                           locations=None, # Fixed by SF if not None
-                           stimulus_size_degrees=(22, 22), # For UCB setup. SPECIFY!
-                           stimulus_size_pixels=(96, 96),
-                           stimulus_hz=15,
-                           phase_mode = None, # define me
-                           ):
-    """Define filter pyramid"""
+from ._motion_energy_cpu import mk_moten_pyramid_params, compute_filter_responses as _compute_filter_responses, mk_3d_gabor
 
-    filters = []
-    for sf, tf, ori, loc in itools.product(spatial_freqs, temporal_freqs, orientations, locations):
-        filters.append(dict(xytsize=None,
-                            center_x=x,
-                            center_y=y,
-                            orientation=ori,
-                            spatial_frequency=sf,
-                            temporal_frequency=tf,
-                            stimulus_size_degrees=stimulus_size_degrees,
-                            stimulus_size_pixels=stimulus_size_pixels)
-                       )
-    return filters
+try:
+    from ._motion_energy_gpu import compute_filter_responses as _compute_filter_responses_gpu
+    gpu_available = True
+    print("Defaulting to use GPU")
+except:
+    print('No GPU available')
+    gpu_available = False
 
-def make_gabors(gabor_params):
-    # formerly handled by show_or_preproces flag 
-    wcount = 0 # ??
-    for gp in gabor_params:
-        # NOT WORKING WIP
-        wcount += 1;
-        if phaseparam in (1, 3, 4):
-            # reconstruct space-time Gabor
-            rgs = gabors[1, :].T * gtw[2, :] + gabors[2, :].T * gtw[1, :]
-            rgs = np.reshape(rgs, [patchxytsize])
-            gaborbank[:, :, :, wcount] = rgs
-        elif phaseparam in (0, 2, 5, 6, 7, 8, 9):
-            # reconstruct space-time Gabor
-            rgc = -gabors[1, :].T * gtw[1, :] + gabors[2, :].T * gtw[2, :]
-            rgc = np.reshape(rgc, patchxytsize)
-            gaborbank[:, :, :, wcount] = rgc
 
-    return gaborbank
-
-def make_3d_gabor(xytsize, center_x=0.5, center_y=0.5, orientation=90, 
-                  spatial_frequency=5, temporal_frequency=2.6, 
-                  spatial_envelope=0.3, temporal_envelope=0.3, 
-                  phase=0, stimulus_hz=None, stimulus_size_degrees=None):
+def compute_motion_energy(stimulus,
+                          stimulus_fps=15,
+                          gabor_temporal_window=None,
+                          temporal_frequencies=(0, 2, 4),
+                          spatial_frequencies=(0, 2, 4, 8, 16, 32),
+                          spatial_directions=(0, 45, 90, 135, 180, 225, 270, 315),
+                          sf_gauss_ratio=0.6,
+                          max_spatial_env=0.3,
+                          gabor_spacing=3.5,
+                          tf_gauss_ratio=10.,
+                          max_temp_env=0.3,
+                          aspect_ratio=None,
+                          include_edges=False,
+                          use_gpu=gpu_available,
+                          ):
+    """   
+    Parameters
+    ----------
+    stimulus : 3D np.array (n, vdim, hdim)
+        The movie frames. Grayscale images only.
+    stimulus_fps : scalar
+        The temporal frequency of the stimulus
+    gabor_temporal_window : scalar, None
+        The number of frames in one filter.
+        If None, it defaults to floor(2/3) of `stimulus_fps`
+        Similar to Nishimoto, 2011.
     """
-    Creates two Gabor functions (90º phase offset) of size (X, Y, T)
+    
+    t, y, x = stimulus.shape
+    if aspect_ratio is None:
+        aspect_ratio = x / y
+    else:
+        assert np.allclose(aspect_ratio, x / y), 'Specified aspect ratio does not match input aspect ratio!'
+    if gabor_temporal_window is None:
+        gabor_temporal_window = int(stimulus_fps * (2. / 3.))
+    if use_gpu:
+        fn = _compute_filter_responses_gpu
+    else:
+        fn = _compute_filter_responses
+
+    moten_pyramid_parameters = dict(
+            temporal_frequencies=temporal_frequencies,
+            spatial_frequencies=spatial_frequencies,
+            spatial_directions=spatial_directions,
+            sf_gauss_ratio=sf_gauss_ratio,
+            max_spatial_env=max_spatial_env,
+            gabor_spacing=gabor_spacing,
+            tf_gauss_ratio=tf_gauss_ratio,
+            max_temp_env=max_temp_env,
+            aspect_ratio=aspect_ratio,
+            include_edges=include_edges,
+            )
+    # gparams = mk_moten_pyramid_params(stimulus_fps, gabor_temporal_window, 
+    #                                 **moten_pyramid_parameters)
+    out = fn(stimulus,
+            stimulus_fps,
+            gabor_temporal_window=gabor_temporal_window,
+            #quadrature_combination=_sqrt_sum_squares, # leave as default
+            output_nonlinearity=lambda x: x,
+            dozscore=False,
+            **moten_pyramid_parameters
+            )
+    if use_gpu:
+        out = np.array(out.cpu())
+    return out
+
+
+# List of parameters relevant to defining gabors
+pyramid_param_list = ['stimulus_fps', 'gabor_temporal_window', 'temporal_frequencies', 
+                      'spatial_frequencies', 'spatial_directions', 
+                      'sf_gauss_ratio', 'max_spatial_env', 'gabor_spacing', 'tf_gauss_ratio', 
+                      'max_temp_env', 'aspect_ratio', 'include_edges']
+
+           # * centerx,centery : horizontal and vertical position
+           # * direction       : direction of motion
+           # * spatial_freq    : spatial frequency
+           # * spatial_env     : spatial envelope (gaussian s.d.)
+           # * temporal_freq   : temporal frequency
+           # * temporal_env    : temporal envelope (gaussian s.d.)
+plot_param_list = ['x_center', 'y_center', 'spatial_direction', 'spatial_frequency', 
+                    'spatial_envelope', 'temporal_frequency', 'temporal_envelope']
+
+
+def pyramid_to_plot_params(**moten_pyramid_parameters):
+    # Filter parameters
+    moten_pyramid_parameters = dict((k,v) for k, v in moten_pyramid_parameters.items() if k in pyramid_param_list)
+    # Convert to gabor parameters
+    gparams = mk_moten_pyramid_params(**moten_pyramid_parameters).T
+    # Generate dict of named parameters instead of implicit array
+    plot_params = {}
+    for i, k in enumerate(plot_param_list):
+        plot_params[k] = gparams[i]
+    if 'aspect_ratio' in moten_pyramid_parameters:
+        plot_params['aspect_ratio'] = moten_pyramid_parameters['aspect_ratio']
+    return plot_params
+
+
+def show_motion_energy(features, params, ax=None, sfile=None, is_overlay=False, cmap=bcworaa, 
+        figsize=(5.12, 5.12), tf_to_show=None, sf_to_show=None, lw_dict=None, 
+        bg_col=(.11, .11, .11), bg_alpha=0.1, vmin=None, vmax=None, 
+        marker_scale=2000, line_scale=1):
+    '''Display short lines at location/orientation/scale of Gabor wavelet channels 
+
+    A cartoony visualization of what the wavelets compute. 
 
     Parameters
     ----------
-    xytsize = vector of x, y, and t size, i.e. [64 64 5]
-    center_x : scalar
-        spatial x center of Gabor function. The axes are normalized to 0 (lower 
-        left corner) to 1(upper right corner). e.g., [0.5 0.5] put the Gabor 
-        at the center of the array.
-    center_y : scalar
-        spatial y center of Gabor function. See above.
-    orientation = scalar
-        The direction of the Gabor function in degree (0-360).
-    spatial_freqency = scalar
-        Determine how many cycles per image for spatial dimensions.
-    temporal_frequency : scalar 
-        Determine how many cycles per [time window]
-    phase : scalar
-        Phase of the Gabor function (optional, default is 0)
-    stimulus_hz : int or None
-        Frame rate of stimulus. If not provided (None), `temporal_frequency`
-        is assumed to be in units of cycles / temporal window (t of xytsize)
-    stimulus_size_degrees : tuple or None
-        (x, y) size of stimulus in degrees of visual angle. If not provided
-        (None), `spatial_frequency` and `spatial_envelope` are assumed to be 
-        in units of cycles / image and fraction of the image, respectively.
-
-    Returns
-    -------
-    gabor = array
-        a gabor function of size X-by-Y-by-T
-    gabor90 = array
-        the quadrature pair the Gabor function
-    """
-    if len(xytsize) < 3:
-        xytsize += (1,)
-    sz_x, sz_y, sz_t = xytsize
-    aspect_ratio = sz_x / sz_y
-    dx = np.linspace(0, aspect_ratio, sz_x)
-    dy = np.linspace(0, 1, sz_y)
-    if sz_t > 1:
-        dt = np.linspace(0, 1, sz_t, endpoint=False) # why?
-    else:  
-        dt = [0.5]
-    
-    iy, ix, it = np.meshgrid(dx, dy, dt)
-    if stimulus_hz is not None:
-        # Convert `temporal_frequency` to cycles / temporal_window
-
-        pass
-    if stimulus_size_degrees is not None:
-        # Convert `spatial_frequency` to cycles / image
-        # Asymmetrical images??
-        spatial_frequency *= stimulus_size_degrees # cycles/image = (cycles/degree) * (degrees / image)
-        pass
-
-    gauss = np.exp( -((ix - center_x)**2 + (iy - center_y)**2) / (2 * spatial_envelope**2) - (it - 0.5)**2 / (2 * temporal_envelope**2))
-
-    fx = -spatial_frequency * np.cos(orientation / 180 * np.pi) * 2 * np.pi
-    fy = spatial_frequency * np.sin(orientation / 180 * np.pi) * 2 * np.pi
-    ft = temporal_frequency * 2 * np.pi
-
-    grat = np.sin((ix - center_x) * fx + (iy - center_y) * fy + (it - 0.5) * ft + phase)
-    gabor = gauss * grat
-
-    grat = np.cos((ix - center_x) * fx + (iy - center_y) * fy + (it - 0.5) * ft + phase)
-    gabor90 = gauss * grat
-
-    if np.max(np.abs(gabor)) == 0:
-        gabor = -gabor90
-
-    gabor = gabor.astype(np.float32)
-    gabor90 = gabor90.astype(np.float32)
-    return gabor, gabor90
-
-def motion_energy(stimulus, 
-    stimulus_hz=None,
-    stimulus_size_degrees=None,
-    direction_divisions=8,
-    direction_selective=False,
-    # SF
-    sf_min=2.0, # in cycles / degree or cycles / image?
-    sf_max=9.0,
-    sf_divisions=5,
-    sf_gaussratio=0.5,
-    s_env_max=0.3,
-    std_step=2.5,
-    wrap_all=False,
-    # TF
-    tf_min=1.0, # Change to Hz! 0.0, # in Hz
-    tf_max=3.0, # Change to Hz!
-    tf_divisions=5,
-    t_size=9,
-    zero_tf=True,
-    tf_gaussratio=0.4,
-    t_env_max=0.3,
-
-    phase_mode=0,
-    phase_mode_sf_max = np.inf,
-    f_step_log=False,
-    f_env_mode=False,
-    f_env_max=0.3,
-    channel_index=None,
-    local_dc=0,
-    zeromean=True,
-    zeromean_value=None, # combine to one
-    verbose=False):
-    """
-
-    Notes: 
-    changes from matlab code:
-    zeromean_value is gone; if you want to normalize by RGB units, do it outside this function
-    show_or_preprocess is gone; use other function
-    separate processing of color channels is gone; do that outside this function
-    deleted gabor_params (WTF was that?)
-    """
-    gaborcachemode = 0 # Hrm...
-
-    # Caching - re-implement?
-    # if ischar(stimulus):
-    #     # Recover matrix from reference matrix (used for recursive calls for
-    #     # color stimuli)
-    #     stimulus = refmat_recover(stimulus); 
-     
-    # Timing
-    start_t = time.time()
-    # Stimulus checks
-    im_y, im_x, n_frames = np.atleast_3d(stimulus).shape
-    if stimulus.dtype not in (np.float, ):
-        stimulus = stimulus.astype(np.float32)
-    # Check min/max?
-    # Stimulus aspect ratio; always X/Y (width/height)
-    aspect_ratio = im_x / im_y
-    patchxytsize = (im_y, im_x, t_size)
-    stimulus = stimulus.reshape([im_y * im_x, n_frames])
-    pixels_per_degree = np.mean([px/deg for px, deg in zip([im_y, im_x], stimulus_size_degrees)])
-    if zeromean is True:
-        if verbose:
-            print('[[zero mean stimuli]]')
-        zeromean = stimulus.mean()
-        stimulus -= zeromean
-        
-    # Make a list of gabor parameters
-    if (gabor_params is None) or (phasemode == 5) or (phasemode == 7): 
-        if verbose:
-            fprintf('Making a list of gabor parameters... \n');
-        # Added aspect ratio as necessary influence on Gabor parameters
-
-###########################################
-### --- STOPPED HERE, WORKING BELOW --- ###
-###########################################        
-# (on get_gabor_parameters)
-        gparams = get_gabor_parameters(params, aspect_ratio);
-
-    waveletchannelnum = len(gparams)
-
-    if verbose:
-        print('%d channels total\n', waveletchannelnum); 
-
-    if verbose and channel_index is not None:
-        print('Valid channel num: %d\n', len(channel_index));
-
-    # Set up a matrix to fill in
-    if show_or_preprocess:
-        if verbose:
-            print('Preprocessing...')
-        spreproc = zeros(stimxytsize(3), waveletchannelnum, 'single');
-    else:
-        if verbose:
-             print('Making wavelets...')
-        if ~np.any(channel_index):
-            gnum = len(waveletchannelnum);
-        else:
-            gnum = len(channel_index);
-        
-        gaborbank = zeros([patchxytsize, gnum], 'single');
+    features : 1D array
+        One weight for each Gabor wavelet channel to plot, normalized to range 0-1
+    params : dict
+        Specifies params 
+        (NOTE: The 1D vector in each field should match up with the weights in `features`)
+        x_center = x positions for each Gabor wavelet (0-1 across image)
+        y_center = y positions for each Gabor wavelet (0-1 across image)
+        spatial_direction = orientation for each Gabor wavelet (in degrees)
+        spatial_frequency = spatial frequency for each Gabor filter (in cycles / image)
+        temporal_frequency = temporal frequency for each Gabor filter (in cycles / filter)
+        spatial_envelope = scale for each Gabor wavelet (0-1 across image)
+    ax : matplotlib axis
+        axis into which to plot (if None, a new figure is created)
+    sfile : str
+        file path to save figure; if None, nothing is saved, just plots
+    is_overlay : bool
+        Whether to format the plot as an overlay for other images or not. Formatting
+        as an overlay sets the background to `bg_alpha`. 
+    cmap : matplotlib colormap
+        colormap for plotting values in `features`
 
 
-    #---------------------------------------------------------------------
-    # Preprocessing
-    #---------------------------------------------------------------------
-    # ignore wavelet pixels for speed-up where:
-    masklimit = 0.001;   ## pixel value < masklimit AND
-    maskenv_below = 0.1; # spatial envelope < maskenv_below x stimulus size
-
-    if gaborcachemode==1:
-        gaborcache = zeros([2, prod(patchxytsize(1:2)), waveletchannelnum], 'single');
-        gtwcache = zeros([2, t_size, waveletchannelnum], 'single');
+    Other Parameters
+    ----------------
+    tf_to_show : list or None
+        indices for which temporal frequency (or frequencies) to display 
+    sf_to_show : 
 
 
-    lastgparam = zeros((9, 1));
-    wcount = 0;
-    for ii in len(waveletchannelnum):
-        
-        if np.any(channel_index) && ~np.any(ii==channel_index):
-            continue
-        
-        thisgparam = gparams(:, ii);
-        thesame = True
-        if np.any(thisgparam([1:7, 9]) ~=lastgparam([1:7, 9])) :
-            thesame = False
-        
-        if not thesame:
-            if gaborcachemode==2:
-                gabors = gaborcache(:, :, ii);
-                gtw = gtwcache(:, :, ii);
-            else:
-                gabor0, gabor90, gtw = make3dgabor_frames(patchxytsize, [thisgparam(1:7); 0; thisgparam(9)]);
-                gabors = np.array([gabor0.flatten(), gabor90.flatten()]).T
-            
-            if gaborcachemode==1:
-                gaborcache[:, :, ii] = gabors
-                gtwcache[:, :, ii] = gtw
-            
-            lastgparam = thisgparam
-        
-        phaseparam = thisgparam[8]
-        if not thesame:
-            spatial_envelope = thisgparam(6);
-            if spatial_envelope < maskenv_below:
-                # UNTESTED
-                smask = np.nonzero(np.sum(np.abs(gabors), 0) > masklimit)
-                chout0, chout90 = dotdelay_frames(gabors(:, smask), gtw, stimulus(smask, :))
-            else:
-                chout0, chout90 = dotdelay_frames(gabors, gtw, stimulus)
-            
-        
-        if phaseparam == 0:
-            # norm of two outputs
-            chout = np.sqrt(chout0**2 + chout90**2)
-            spreproc[:, ii] = chout
-        elif phaseparam == 1:
-            # only linear output
-            chout = chout0
-            spreproc[:, ii] = chout
-        elif phaseparam == 2:
-            # Only 90º offset output
-            chout = chout90
-            spreproc[:, ii] = chout
-        elif phaseparam == 3:
-            # Rectified 
-            chout = chout0
-            chout[chout < 0] = 0
-            spreproc[:, ii] = chout
-        elif phaseparam == 4:
-            chout = chout0
-            chout[chout > 0] = 0
-            spreproc[:, ii] = -chout
-        elif phaseparam == 5:
-            chout = chout90
-            chout[chout < 0] = 0
-            spreproc[:, ii] = chout
-        elif phaseparam == 6:
-            chout = chout90
-            chout[chout > 0] = 0
-            spreproc[:, ii] = -chout
-        elif phaseparam == 7:
-            chout = np.arctan2(chout90, chout0)
-            dtphase = np.vstack([[0], np.diff(chout, 1, 1)]) # prob borked
-            dtphase = dtphase + -2 * pi * np.sign(dtphase) * np.round(np.abs(dtphase) / (2 * pi))
-            spreproc[:, ii] = dtphase
-        elif phaseparam == 8:
-            chout = np.arctan2(chout90, chout0)
-            dtphase = [0; diff(chout, 1, 1)]
-            dtphase = dtphase+ -2*pi*sign(dtphase).* ...
-                round(abs(dtphase)./(2*pi))
-            dtphase(dtphase<0) = 0
-            spreproc[:, ii] = dtphase
-        elif phaseparam == 9:
-            chout = np.arctan2(chout90, chout0)
-            dtphase = [0; diff(chout, 1, 1)]
-            dtphase = dtphase+ -2*pi*sign(dtphase).* ...
-                round(abs(dtphase)./(2*pi))
-            dtphase(dtphase>0) = 0
-            spreproc(:, ii) = -dtphase            
-        
-        # Some progress indicator
-        #if verbose:
-        #    progressdot(ii, 50, 1000, waveletchannelnum);
+    Notes
+    -----
+    As they are currently computed, Gabor wavelets are not normalized by different scales and spatial
+    frequencies. This means that large / low-frequency Gabor wavelets computed from an image generally
+    have much larger values than small / low-frequency Gabor wavelets. Thus, for purposes of visualizing
+    Gabor wavelets of different scales computed for the same image, it is currently a good idea to 
+    normalize the values of each channel separately in some way. For example, you might take the 
+    Z score across time and clip outliers (say, values > 4.5)
 
-    if gaborcachemode==1:
-        gaborcache = gaborcache
-        gtwcache = gtwcache
-        gaborcachemode = 2
-
-
-    if verbose:
-        disp(sprintf('Wavelet preprocessing done in #.1f min (cputime).', (cputime-start_t)/60))
-        if show_or_preprocess:
-            disp(sprintf('#d channels, #d samples', size(spreproc, 2), size(spreproc, 1)))        
-
-    if show_or_preprocess:
-        if phasemode==5 | phasemode==6 | phasemode==7 | phasemode==8:
-            pind = np.nonzero(gparams[8, :]==7 | gparams[8, :]==8 | gparams[8, :]==9)
-            print('thresholding phase channels...')
-            for p in range(len(pind)):
-                phasech = spreproc[:, pind[p]]
-                if gparams[8, pind[p]-1] == 0 :
-                    # look for the corresponding amplitude channel
-                    ampch = spreproc[:, pind[p]-1]
-                else:
-                    ampch = spreproc[:, pind[p]-2]
-                
-                a_thresh = nanstd(ampch)*a_thresh
-                avalind = ampch>a_thresh
-                avalind = and(avalind, [0; avalind(1:-1)])
-                phasech(~avalind) = 0
-                spreproc(:, pind(p)) = phasech
-            
-            if phasemode==5 | phasemode==7 :
-                # return dPhase/dt channels only
-                spreproc = spreproc(:, pind)
-                gparams = gparams(:, pind)
-                fprintf('Using only dPhase/dt channels: #d\n', size(spreproc, 2))
-
-
-    gaborparams = gparams
-
-    return spreproc
-
-
-#---------------------------------------------------------------------
-# Making a list of gabor parameters
-#---------------------------------------------------------------------
-def get_gabor_parameters(
-    stimulus_size_pixels, # xytsize?
-    stimulus_hz,
-    stimulus_size_degrees=22.5,
-    direction_divisions=8,
-    direction_selective=False,
-    # SF
-    sf_min=2.0, # in cycles / degree
-    sf_max=9.0,
-    sf_divisions=5,
-    sf_gaussratio=0.5,
-    s_env_max=0.3,
-    std_step=2.5,
-    wrap_all=False,
-    # TF
-    tf_min=1.0, # Change to Hz! 0.0, # in Hz
-    tf_max=3.0, # Change to Hz!
-    tf_divisions=5,
-    t_size=9,
-    zero_tf=True,
-    tf_gaussratio=0.4,
-    t_env_max=0.3,
-
-    phase_mode=0,
-    phase_mode_sf_max = np.inf,
-    f_step_log=False,
-    f_env_mode=False,
-    f_env_max=0.3,
-    channel_index=None,
-    local_dc=0,
-    zeromean=True,
-    zeromean_value=None, # combine to one
-    verbose=False):
-
-
-    if f_step_log:
-        sf_array = np.logspace(np.log10(sf_min), np.log10(sf_max), sf_divisions)
-        if zero_tf:
-            tf_array = np.logspace(np.log10(tf_min), np.log10(tf_max), tf_divisions-1)
-            tf_array = np.hstack([0, tf_array])
-        else:
-            tf_array = np.logspace(np.log10(tf_min), np.log10(tf_max), tf_divisions)
-        
-    else:
-        sf_array = np.linspace(sf_min, sf_max, sf_divisions)
-        tf_array = np.linspace(tf_min, tf_max, tf_divisions)
-
-    dir_array = np.arange(direction_divisions) / direction_divisions * 360 # OR: * 2 * np.pi?
-    dirstart = 1
-    if local_dc:
-        dirstart = 0 # add local dc channels
-
-    if phasemode==0:
-        pmarray = [0]
-    elif phasemode==1:
-        # linear sin and cos transform amplitudes
-        pmarray = [1, 2]
-    elif phasemode==2:
-        # half rectified sin and cos amplitudes
-        pmarray = [3, 4, 5, 6]
-    elif phasemode==3:
-        # 0+1
-        pmarray = [0, 1, 2]
-    elif phasemode==4:
-        # 0+2
-        pmarray = [0, 3, 4, 5, 6]
-    elif phasemode==5:
-        # phase: atan2(sin, cos)
-        pmarray = [0, 7]
-    elif phasemode==6:
-        # 0+5
-        pmarray = [0, 7]
-    elif phasemode==7:
-        # phase: atan2(sin, cos), half-rectified
-        pmarray = [0, 8, 9]
-    elif phasemode==8:
-        # 0+7
-        pmarray = [0, 8, 9]
-
-    waveletcount = 0;
-    #gparams = np.zeros(8, 20000, 'single'); # prepare for some amount of memory for gparams
+    '''
+    # Handle inputs
+    gmax = np.max(np.abs(features))
+    if ('temporal_frequencies' in params) and ('temporal_frequency' not in params):
+        # Params are pyramid creation params. Convert.
+        params = pyramid_to_plot_params(**params)
+    if vmin is None:
+        vmin = -gmax
+    if vmax is None:
+        vmax = gmax
+    # Set colors of displayed lines
+    cnorm = colors.Normalize(vmin=vmin, vmax=vmax)
+    cols = cmap(cnorm(features))
     # 
-    # # Add a row to gparams to account for aspect ratio
-    # gparams = [gparams;ones(1, size(gparams, 2), 'single')];
-    for tf in tf_array:
-        for sf in sf_array:
-            spatial_envelope = s_env_max
-            if sf != 0:
-                spatial_envelope = np.min([s_env_max, 1 / sf * sf_gaussratio])
-            temporal_envelope = t_env_max
-            if tf != 0:
-                temporal_envelope = min([t_env_max, 1 / tf * tf_gaussratio])
+    if 'temporal_frequency' in params:
+        tfs = params['temporal_frequency']
+    else:
+        tfs = []
+    sfs = params['spatial_frequency']
+    if 'spatial_direction' in params:
+        oris = params['spatial_direction']
+    else:
+        oris = []
+    u_sfs = np.unique(sfs)
+    u_tfs = np.unique(tfs)
+    # `spatial_envelope` is the std. dev. of the Gabor motion energy filter; 
+    # thus, a good radius for the lines to be drawn here.
+    radii = params['spatial_envelope'] * line_scale
+    mksz = params['spatial_envelope'] * marker_scale
+    xs = params['x_center']
+    ys = params['y_center']
+    if ax is None:
+        fig = plt.figure(figsize=figsize)
+        ax = plt.gca()
+        ax.set_position((0, 0, 1, 1))
+        show_fig = True
+    else:
+        fig = ax.get_figure()
+        show_fig = False
+    # Add scale to this...?
+    width = params['aspect_ratio']
+    height = 1.0
+    # Get indices to select specific temporal or spatial frequency Gabors
+    if not tf_to_show is None:
+        tf_idx = np.isclose(tfs, tf_to_show)
+    else:
+        tf_idx = np.ones(xs.shape) > 0
+    sf_idx = sfs > 0
+    sf0_idx = sfs == 0
+    if not sf_to_show is None:
+        if not isinstance(sf_to_show, (list, tuple)):
+            sf_to_show = [sf_to_show]
+        sfi = np.any(np.vstack([np.isclose(sfs, sf_) for sf_ in sf_to_show]), axis=0)
+        sf_idx = sf_idx & sfi
+        sf0_idx = sf0_idx & sfi
+    # Get linewidths for spatial frequencies
+    if lw_dict is None:
+        max_lw = 16
+        min_lw = 2
+        lw_ = np.linspace(max_lw, min_lw, len(u_sfs))
+        # Other options for mapping spatial freq. to line width:
+        # or: lw_ = np.logspace(1, 3, len(sfs), base=2)
+        # or: lw_ = np.unique(sfs)**-1 / np.max(np.unique(sfs)**-1)*6.
+        lw_dict = dict((sf, lw) for sf, lw in zip(u_sfs, lw_))
+    lws = np.zeros(xs.shape) # Nans?
+    for sf in u_sfs:
+        if sf==0:
+            continue
+        jj = sfs == sf
+        lws[jj] = lw_dict[sf]
 
-            if not direction_selective:
-                tf += i            
-            # Account for asymmetrical images
-            if aspect_ratio==1:
-                # Symmetrical images
-                numsps2 = np.floor((1 - spatial_envelope * std_step) / (std_step * spatial_envelope) / 2)
-                numsps2 = np.max([numsps2, 0]);
-                if numsps2 >= 1 and wrap_all:
-                    numsps2 = numsps2 + 1
-                
-                centers = spatial_envelope * std_step * np.arange(-numsps2, numsps2) + 0.5
-                [cx, cy] = np.meshgrid(centers, centers)
-                print('AR=1, sf=%.2f, nx=%d, ny=%d\n', sf, len(cx), len(cy))
+    ii = tf_idx & sf_idx
+    i0 = tf_idx & sf0_idx
+    lw = [l for i, l in zip(ii, lws) if i]
+    #mksz = [100*r for i, r in zip(i0, radii) if i]
+    # X, Y offsets for oriented edges (from center point of Gabor)
+    if np.any(ii) and len(oris) > 0:
+        xa = radii*np.sin(np.radians(oris))
+        ya = radii*np.cos(np.radians(oris))
+        # X, Y 
+        X = np.array([xs[ii] + xa[ii], xs[ii] - xa[ii]])
+        Y = np.array([(1-ys[ii]) + ya[ii], (1-ys[ii]) - ya[ii]])
+        #Y = (1-Y)  # Flip to image coordinates
+        # Define line segments in a list
+        edges = [[(X.T[i, 0], Y.T[i, 0]), (X.T[i, 1], Y.T[i, 1])] for i in range(np.sum(ii))]
+        # Add line collection to plot
+        LC = LineCollection(edges, colors=cols[ii, :], linewidth=lw)
+        ax.add_collection(LC)
+    # Add dots for sf=0
+    if np.any(i0):
+        plt.scatter(xs[sf0_idx], (1-ys[sf0_idx]), color=cols[sf0_idx, :], s=mksz[i0])
+    # Final Setup
+    plt.setp(ax, aspect='equal', xlim=(0, width), ylim=(0, height), xticks=(), yticks=())
+    pdict = dict(color=bg_col, alpha=1) 
+    if is_overlay:
+        pdict.update(alpha=bg_alpha)
+        plt.setp(fig.patch, alpha=0.)
+    plt.setp(ax.patch, **pdict)
+    if sfile is not None:
+        fig.savefig(sfile, dpi=100)
+
+
+
+def show_motion_energy_color(features, params, ax=None, is_overlay=False,
+        figsize=(5.12, 5.12), marker_scale=2000, line_scale=1, lw_dict=None, 
+        combine_ori_fn=np.mean, bg_col=(.11, .11, .11), bg_alpha=0.1, 
+        vmin=None, vmax=None, groups=None):
+    '''Display short lines at location/orientation/scale of Gabor wavelet channels 
+
+    A cartoony visualization of Gabor motion energy features. Each color represents
+    a different temporal frequency (originally, r = 0 hz, g = 2 hz, b = 4 hz). For
+    other motion energy filters, different visualizations will be needed.
+
+    Parameters
+    ----------
+    features : 1D array
+       One weight for each Gabor wavelet channel to plot
+    params : dict
+        parameters used to compute the motion energy features;
+        i.e., all kwargs passed to `compute_motion_energy()`
+    ax : axis
+        axis into which to plot. If None, new figure + axis
+        are created
+    is_overlay : bool
+        whether plot is meant as an overlay for an image or movie 
+        frame (if True, background options are applied, i.e.
+        background is mostly transparent)
+    marker_scale : scalar
+        Arbitrary scaling from values for size of features
+    line_scale : scalar 
+        same.
+    lw_dict : dict
+        dictionary of line widths for filters of different 
+        spatial frequencies. See code.
+    combine_ori_fn : function
+
+
+
+    Notes
+    -----
+    As they are currently computed, Gabor wavelets are not normalized by different scales and spatial
+    frequencies. This means that large / low-frequency Gabor wavelets computed from an image generally
+    have much larger values than small / low-frequency Gabor wavelets. Thus, for purposes of visualizing
+    Gabor wavelets of different scales computed for the same image, it is currently a good idea to 
+    Thi Normalization for visualization is best done separately for each channel over a timecourse - 
+    e.g., you can take the Z score across time clip outliers (say, > 4.5), and re-scale the resulting
+    values from -1 to 1; then multiply that by .5 and add .5
+
+
+    '''
+    # Handle inputs
+    gmax = np.max(np.abs(features))
+    update = groups is not None
+    if not update:
+        groups = []
+    if ('temporal_frequencies' in params) and ('temporal_frequency' not in params):
+        # Params are pyramid creation params. Convert.
+        params = pyramid_to_plot_params(**params)    
+    if vmin is None:
+        vmin = -gmax
+    if vmax is None:
+        vmax = gmax
+    cnorm = colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
+    gnorm = cnorm(features)
+    # Simpler parameters
+    xs = params['x_center'] # / params['aspect_ratio'] # Seems sketch
+    ys = params['y_center']
+    tfs = params['temporal_frequency']
+    sfs = params['spatial_frequency']
+    oris = params['spatial_direction']
+    # `spatial_envelope` parameter is the std. dev. of the Gabor;
+    # thus, a good radius for the lines to be drawn here.
+    radii = params['spatial_envelope'] * line_scale
+    height = 1.0
+    width = params['aspect_ratio']
+    xa = radii * np.sin(np.radians(oris))
+    ya = radii * np.cos(np.radians(oris))
+    # Define line segments
+    X = np.array([xs + xa, xs - xa])
+    #Y = (1 - np.array([(1-ys) + ya, (1-ys) - ya]))
+    #Y = np.array([(1-ys) + ya, (1-ys) - ya])
+    Y = 1 - np.array([ys + ya, ys - ya])
+    edges = np.array([[(X.T[i, 0], Y.T[i, 0]), (X.T[i, 1], Y.T[i, 1])] for i in range(np.max(X.shape))])
+    # Define marker size for sf=0 (Gaussians)
+    mksz = params['spatial_envelope'] * marker_scale
+    # Prep plot
+    if ax is None:
+        fig = plt.figure(figsize=figsize)
+        ax = plt.gca()
+        ax.set_position((0, 0, 1, 1))
+        show_fig = True
+    else:
+        fig = ax.get_figure()
+        show_fig = False
+    # Get indices to select specific temporal or spatial frequency Gabors
+    u_tfs = np.unique(tfs)
+    u_sfs = np.unique(sfs)
+    # Get linewidths for spatial frequencies
+    if lw_dict is None:
+        max_lw = 16
+        min_lw = 2
+        u_sfs = np.unique(sfs)
+        lw_ = np.linspace(max_lw, min_lw, len(u_sfs))
+        # Other options for mapping spatial freq. to line width:
+        # or: lw_ = np.logspace(1, 3, len(sfs), base=2)
+        # or: lw_ = np.unique(sfs)**-1 / np.max(np.unique(sfs)**-1)*6.
+        lw_dict = dict((sf, lw) for sf, lw in zip(u_sfs, lw_))
+    lws = np.zeros(xs.shape) # Nans?
+    for sf in u_sfs:
+        if sf==0:
+            continue
+        jj = sfs == sf
+        lws[jj] = lw_dict[sf]
+
+    oris_big = oris > 179.9
+
+    for j, sf in enumerate(u_sfs):
+        sfi = np.isclose(sfs, sf)
+        # Deal with opposite orientations (directions of motion, if present)
+        # These lines (maybe, implicilty?) assume they will be combined somehow 
+        # rather than dealt with separately.
+        tfis = [np.isclose(tfs, tf) for tf in u_tfs]
+        ns = [np.sum(sfi & tfi) for tfi in tfis]
+        n = np.min(ns)
+        cols = np.zeros((n, 4))
+        for itf, tf in enumerate(u_tfs):
+            tfi = np.isclose(tfs, tf)
+            if np.any(oris_big[sfi & tfi]):
+                frac_gt_180 = np.mean(oris_big[sfi & tfi])
+                if not frac_gt_180 == 0.5:
+                    raise ValueError('Assumptions not met! half of orientations are not 180 + other half!')
+                to_plot = gnorm[sfi & tfi].copy()
+                # Test that oris match up
+                o1 = oris[sfi & tfi][~oris_big[sfi & tfi]]
+                o2 = oris[sfi & tfi][oris_big[sfi & tfi]]
+                assert np.allclose(o1 + 180, o2)
+                combined_data = np.vstack([to_plot[oris_big[sfi & tfi]],
+                                           to_plot[~oris_big[sfi & tfi]]])
+                # Redefine to_plot to be some function of other orientations
+                to_plot = combine_ori_fn(combined_data, axis=0)
             else:
-                # aspect_ratio is x/y. Thus ar*x = true x OR y/ar = true y
-                # Compute 
-                g_sz_x = spatial_envelope * std_step
-                n_gabors_x = np.floor((1 - g_sz_x) / (g_sz_x) / 2)
-                n_gabors_x = np.max([n_gabors_x, 0])
-                # THIS RIGHT HERE. this makes the aspect ratio actually y:x,
-                # and applies the aspect ratio only in the y direction.
-                # poss: treat size as 1 (or rather, aspect ratio=1) -- this
-                # would recover the same centers as AR=1. then make elongated
-                # gabor's using the AR and direction, so that elongation is in
-                # the direction. Center one such at each center; they'll
-                # overlap and overflow (in which case truncate), then look...
-                g_sz_y = spatial_envelope * std_step * aspect_ratio;
-                #g_sz_y = spatial_envelope*std_step;
-                n_gabors_y = floor((1-g_sz_y)/(g_sz_y)/2);
-                n_gabors_y = max([n_gabors_y, 0]);
-                #REPLACED:
-                #numsps2 =floor((1-spatial_envelope*std_step)/(std_step*spatial_envelope)/2);
-                #numsps2 = max([numsps2 0]);
-                #if numsps2>=1 && wrap_all:
-                if wrap_all:
-                    error('I don''t know what to do with wrap_all parameter yet w/ asymmetrical images...')
-                    #numsps2 = numsps2 + 1;
-                
-                centers_x = g_sz_x*(-n_gabors_x:n_gabors_x) + 0.5 ;
-                centers_y = g_sz_y*(-n_gabors_y:n_gabors_y) + 0.5 ;
-                [cx, cy] = meshgrid(centers_x, centers_y);
-                # Elongate gabors if differential sampling in x and y does not:
-                # make the gabors circular
-                # BUT ONLY IF there is no elongation parameter? (BUT WHERE THE
-                # HELL DOES/DID THAT COME IN? nowhere that I (ML) can find in
-                # Shinji's code. Must have been a hand-coded addition to
-                # make3dgabor_frames.
-                sampling_aspect_ratio = len(centers_x)/len(centers_y);
-                elong = aspect_ratio / sampling_aspect_ratio;
-                fprintf('AR=#.2f, sf=#.2f, g_sz_x=#.2f, nx=#d, g_sz_y=#.2f, ny=#d\n', aspect_ratio, sf, g_sz_x, len(cx), g_sz_y, len(cy));
-                #keyboard;
-                    
-            thisnumdirs = len(dir_array);
-            if tf == 0 || direction_selective == 0:
-                thisnumdirs = ceil(thisnumdirs/2);  # use only ~180 deg
-            
-            if sf == 0:
-                thisnumdirs = 1;
-            
-            for xyi in range(len(cx.flatten())):
-                xcenter = cx[xyi]
-                ycenter = cy[xyi]
-                for diri in range(dirstart, thisnumdirs): #dirstart:thisnumdirs
-                    if diri:
-                        dir = dir_array(diri)
-                        thissf = sf
-                    else:
-                        if local_dc == 1:
-                            dir = 0; thissf = 0; # local dc channels
-                        else:
-                            dir = 0; thissf = sf*0.01; # to avoid the exact same channel
-                        
-                    
-                    if  thissf >= phasemode_sfmax:
-                        waveletcount = waveletcount+1;
-                        thisgparam = [xcenter ycenter dir thissf tf spatial_envelope temporal_envelope 0 1];
-                        if aspect_ratio != 1:
-                            thisgparam(9) = max(elong, 1);
-                        
-                        gparams(:, waveletcount) = thisgparam;
-                    else:
-                        for pmod in pmarray:
-                            waveletcount = waveletcount+1
-                            thisgparam = [xcenter ycenter dir thissf tf spatial_envelope temporal_envelope pmod 1]
-                            if aspect_ratio != 1:
-                                thisgparam(9) = max(elong, 1)
-                            
-                            gparams[:, waveletcount] = thisgparam
-                        
-                    
-                
-            
-        
+                to_plot = gnorm[sfi & tfi].copy()
+            cols[:, itf] = to_plot
+        # Alpha channel
+        cols[:, 3] = np.abs(cols[:, :2] - 0.5).max(axis=1) * 2
+        tfi = tfis[np.argmin(ns)]
+        jj = sfi & tfi
+        if sf == 0:
+            if update:
+                groups[j].set_color(cols)
+            else:
+                DOTS = ax.scatter(xs[jj], (1 - ys[jj]), color=cols, s=mksz[jj])
+                groups.append(DOTS)
+        else:
+            if update:
+                groups[j].set_color(cols)
+            else:
+                LC = LineCollection(edges[jj], colors=cols, linewidth=lws[jj])
+                groups.append(LC)
+                ax.add_collection(LC)    
+    # Final Setup
+    plt.setp(ax, aspect='equal', xlim=(0, width), ylim=(0, height),
+             xticks=(), yticks=())
+    pdict = dict(color=bg_col, alpha=1)
+    if is_overlay:
+        pdict.update(alpha=bg_alpha)
+        plt.setp(fig.patch, alpha=0.)
+    plt.setp(ax.patch, **pdict)
+    return groups
 
+def make_motion_energy_animation_color(images, features, params, figsize=(5, 5), **kwargs):
+    """Make a colorized animation of motion energy features
 
-    gparams = gparams(:, 1:waveletcount);
+    Parameters
+    ----------
+    images : array
+        stack of images, (time, vdim, hdim, [c]), in a format showable by plt.imshow()
+    features : array
+        (time x features) array of motion energy features
+    params : dict
+        dictionary of parameters used to compute the motion energy features
+    figsize : tuple
+        Size of figure
+
+    Other Parameters
+    ----------------
+    kwargs are passed to `show_motion_energy_color()`
+    
+    Notes
+    -----
+    Good tutorial, fancy extras: https://alexgude.com/blog/matplotlib-blitting-supernova/
+    """
+    from functools import partial
+    # First set up the figure, the axis, and the plot element we want to animate
+    fig, ax = plt.subplots(figsize=figsize)
+    # Shape
+    extent = [0, params['aspect_ratio'], 0, 1]
+    # interval is milliseconds; convert fps to milliseconds per frame
+    interval = 1000 / params['stimulus_fps']
+    # Setup
+    if np.ndim(images) == 3:
+        n_frames, y, x = images.shape
+        im_shape = (y, x)
+        imkw=dict(cmap='gray')
+    else:
+        n_frames, y, x, c = images.shape
+        im_shape = (y, x, c) 
+        imkw = {}
+    im = ax.imshow(images[0], extent=extent, **imkw)
+    grps = show_motion_energy_color(features[0], params, ax=ax, 
+                is_overlay=True, **kwargs)
+    artists = (im, *grps)
+    plt.close(fig.number)
+    # initialization function: plot the background of each frame
+    def init_func(fig, ax, artists):
+        _ = show_motion_energy_color(np.zeros_like(features[0]), params, 
+            ax=ax, is_overlay=True, groups=artists[1:], *kwargs)
+        im.set_array(np.zeros(im_shape))
+        return artists 
+    # animation function. This is called sequentially
+    def update_func(i, artists, features):
+        _ = show_motion_energy_color(features[i], params, 
+            ax=ax, is_overlay=True, groups=artists[1:], **kwargs)
+        artists[0].set_array(images[i])
+        return artists
+    init = partial(init_func, fig=fig, ax=ax, artists=artists)
+    update = partial(update_func, artists=artists, features=features)
+    # call the animator. blit=True means only re-draw the parts that have changed.
+    anim = animation.FuncAnimation(fig, 
+                func=update, 
+                init_func=init,
+                frames=n_frames, 
+                interval=interval, 
+                blit=True)
+    return anim

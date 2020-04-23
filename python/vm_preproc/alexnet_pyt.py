@@ -6,20 +6,11 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torchvision import models as pytmodels
-
+import file_io as fio
 import time
 
-# Module-ify me
-from . import file_io as fio
 
 ### --- Base AlexNet model --- ###
-try:
-    # This is a memory hog at load time; consider commenting out and loading in functions below
-    alexnet_model = pytmodels.alexnet(pretrained=True)
-except:
-    print("Alexnet not loaded from pytorch for whatever reason")
-    alexnet_model = None
-
 class AlexNetLayer(nn.Module):
     """Allows feature output from different layers of Alexnet"""
     def __init__(self, layer, base_network=None): # base_network=alexnet_model
@@ -85,7 +76,8 @@ def run_cnn(ims, model, image_transform=None,
 
     retrieves activations of alexnet for specified layer
 
-    ims is a list of image file names"""
+    ims is a list of image file names or an array of images (x, y, c, t)
+    """
 
     # Convert data to pytorch variable
     if isinstance(ims, list):
@@ -97,7 +89,7 @@ def run_cnn(ims, model, image_transform=None,
     data_loader = fio.DataLoader(ds, batch_size=50, shuffle=False, num_workers=num_workers)
     # Get nn model
     if model is None:
-        model = pytmodels.alexnet(pretrained=True) #alexnet_model
+        model = pytmodels.alexnet(pretrained=True)
     # Graphics card or no
     if use_gpu:
         model = model.cuda()

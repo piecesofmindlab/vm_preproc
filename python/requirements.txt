@@ -2,23 +2,8 @@ numpy>=1.6.0
 scipy>=0.9.0
 sklearn
 scikit-image
-pytorch
+torch
 torchvision
 h5py
-json
-socket
-subprocess
-cv2
-
-# overkill?
-os
-glob
-uuid
-warnings
-functools
-
-# custom - still need pip installers
-cottoncandy
-pycortex
-couchdb
-glabtools #? 
+opencv-python
+appdirs
