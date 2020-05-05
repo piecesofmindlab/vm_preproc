@@ -209,7 +209,7 @@ class DataSet(object):
         if self._n_frames is None:
             if self._data is None:
                 fnm, ext = os.path.splitext(self.fpath)
-                sz = file_io.var_size(self.fpath)
+                sz = file_io.var_size(self.fpath, variable_name=self.variable_name)
                 if ext in ('.mp4',):
                     frames = sz[-1]
                 else:
@@ -295,7 +295,19 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                 # Write hdf
                 if ibatch==0:
                     # For first batch, create dataset
-                    dshape = (n_frames, *out.shape[1:])
+                    # First, check for DOWNSAMPLING of data:
+                    n_frames_batch = stim.shape[0]
+                    n_frames_output = out.shape[0]
+                    if n_frames_output < n_frames_batch:
+                        # If present, compute downsampling factor
+                        ds_factor = n_frames_batch / n_frames_output
+                        tolerance = 1e-6
+                        if ds_factor % 1 > tolerance:
+                            raise ValueError("Downsampling by non-integer factor detected; I die now.")
+                        n_frames_out = int(n_frames / ds_factor)
+                    else:
+                        n_frames_out = n_frames
+                    dshape = (n_frames_out, *out.shape[1:])                    
                     outpt.create_dataset('data', dtype=out.dtype, shape=dshape, compression='gzip')
                 outpt['data'][idx[0]:idx[1]] = out
             else:

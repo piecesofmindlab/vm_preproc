@@ -36,7 +36,7 @@ try:
 except:
     print('No GPU available')
     gpu_available = False
-
+gpu_available = False
 
 def compute_motion_energy(stimulus,
                           stimulus_fps=15,
