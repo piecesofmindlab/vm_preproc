@@ -1,5 +1,14 @@
 # Compute 3D scene structure features as in Lescroart & Gallant 2017
+
 import numpy as np
+import matplotlib.pyplot as plt
+
+from matplotlib import cm,colors
+from matplotlib import transforms as mtransforms
+from matplotlib.patches import FancyBboxPatch
+from matplotlib.collections import LineCollection
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
 from skimage import color as skcol
 try:
     import cv2 as cv
@@ -75,6 +84,94 @@ N_BINS_DIST = 10
 MAX_DIST = 100
 DIST_BIN_EDGES = np.logspace(np.log10(1), np.log10(MAX_DIST), N_BINS_DIST)
 DIST_BIN_EDGES = np.hstack([0, DIST_BIN_EDGES[:-1], 999])
+
+
+# (There must be a better solution for this...)
+from matplotlib.colors import LinearSegmentedColormap
+
+List = ([(1,0,0),(1.,.5,0),(1,.85,1),(0,.5,1),(0,0,1)][::-1])
+BCWOR = LinearSegmentedColormap.from_list('BCWOR',List)
+List = ([(1,0,0,1.),(1.,.5,0,.625),(1,.85,1,.25,),(0,.5,1,.625),(0,0,1,1.)][::-1])
+BCWORa = LinearSegmentedColormap.from_list('BCWORa',List)
+List = ([(1,0,0,1.),(1.,.5,0,.5),(1,.85,1,0,),(0,.5,1,.5),(0,0,1,1.)][::-1])
+BCWORaa = LinearSegmentedColormap.from_list('BCWORaa',List)
+
+# Supporting functions 
+
+def vector2camMatrix(cVec,IgnoreRotXYZ=(False,True,False)):
+    """Gets the camera (perspective) transformation, given a vector from camera->fixation
+    
+    Optionally, sets one (or more) axes of rotation for the camera to zero
+    
+    This provides a matrix that "un-rotates" the camera perspective, but leaves whatever
+    axes are set to "true" untouched (i.e., in their original image space). 
+    
+    Parameters
+    ----------
+    IgnoreRot : 3-vector
+    [false,true,false] by default (there should be no y rotation [roll] of cameras)    
+    """
+
+    # Vector to Euler angles:
+    if IgnoreRotXYZ[0]:
+       xR = 0
+    else:
+       #xR = rad2deg(np.arctan2(cVec[2],(cVec[0]**2+cVec[1]**2)**.5))
+       xR = np.arctan2(cVec[2],(cVec[0]**2+cVec[1]**2)**.5)
+    if IgnoreRotXYZ[1]:
+       yR = 0. # ASSUMED - no roll of camera 
+    else:
+       raise Exception('fix me! (I don''t know how to compute y rotations! consult wikipedia!)')
+    if IgnoreRotXYZ[2]:
+       zR = 0.
+    else:
+       #zR = -rad2deg(np.arctan2(cVec[0],cVec[1]))
+       zR = -np.arctan2(cVec[0],cVec[1])
+
+    # Rotation matrices, given Euler angles:
+    # X rotation
+    xRot = np.array([[1., 0., 0.],
+       [0., np.cos(xR),np.sin(xR)],
+       [0., -np.sin(xR), np.cos(xR)]])
+    # Y rotation
+    yRot = np.array([[np.cos(yR), 0., -np.sin(yR)],
+       [0., 1., 0.],
+       [np.sin(yR), 0., np.cos(yR)]])
+    # Z rotation
+    zRot = np.array([[np.cos(zR),np.sin(zR), 0.],
+       [-np.sin(zR), np.cos(zR), 0.],
+       [0., 0., 1.]])
+
+    CamMat = xRot.dot(yRot).dot(zRot)
+    return CamMat
+
+def angle2dcm(r1,r2,r3,rot_order='xyz'):
+    """Create rotation matrix (discrete cosine matrix) for set of Euler rotations
+
+    Only works with rotation order r1=x,r2=y,r3=z for now!
+    """
+    if rot_order!='xyz':
+       raise NotImplemented("Need to define other rotations!")
+    # Allow for r1, r2, r3 to be arrays?
+    # angles = np.vstack([r1.flatten(), r2.flatten(), r3.flatten()]).T
+    angles = np.vstack([r1, r2, r3]).T
+    dcm = np.zeros((3,3,angles.shape[0]))
+    cang = np.cos(angles)
+    sang = np.sin(angles)
+    ## -- Below is all specific to x,y,z rotations -- ##
+    #   [     cy*cz, sz*cx+sy*sx*cz, sz*sx-sy*cx*cz]
+    #   [    -cy*sz, cz*cx-sy*sx*sz, cz*sx+sy*cx*sz]
+    #   [    sy,   -cy*sx,   cy*cx]
+    dcm[0,0,:] = cang[:,1]*cang[:,2]
+    dcm[0,1,:] = sang[:,0]*sang[:,1]*cang[:,2] + cang[:,0]*sang[:,2]
+    dcm[0,2,:] = -cang[:,0]*sang[:,1]*cang[:,2] + sang[:,0]*sang[:,2]
+    dcm[1,0,:] = -cang[:,1]*sang[:,2]
+    dcm[1,1,:] = -sang[:,0]*sang[:,1]*sang[:,2] + cang[:,0]*cang[:,2]
+    dcm[1,2,:] = cang[:,0]*sang[:,1]*sang[:,2] + sang[:,0]*cang[:,2]   
+    dcm[2,0,:] = sang[:,1]
+    dcm[2,1,:] = -sang[:,0]*cang[:,1]
+    dcm[2,2,:] = cang[:,0]*cang[:,1]
+    return dcm
 
 
 def compute_distance_orientation_bins(normals,
@@ -340,3 +437,98 @@ def tilt_slant_hist(tilt, slant, n_slant_bins = 30, n_tilt_bins = 90, do_log=Tru
     ax.set_theta_offset(-np.pi/2)
     if ax is None:
         plt.colorbar(pc)
+
+
+def show_sdn(wts, params, mn_mx=None, lw=1, cmap=BCWORa, ax=None, show_axis=False, 
+             azim=-80, elev=10, dst_spacing=3, pane_scale=1, cbar=False):
+    """Show scene depth/normal model channels
+    """
+    # forget tiled models for now - they don't work anyway.
+    #if params['sky_channel']:
+    #    sky = wts[-1]
+    #    wts = wts[:-1]
+    if mn_mx is None:
+        # Default to min/max of wts, respecting zero
+        mx = np.max(np.abs(wts)) * 0.8
+        mn_mx = (-mx,mx)
+    bin_centers = params['normBinCenters']
+    nD = len(params['DepthDiv'])-1
+    DstAdd = np.array([0,1,0]);
+    
+    # Base patch, facing -y direction
+    base_patch = np.array([[-1,0,-1],[-1,0,1],[1,0,1],[1,0,-1],[-1,0,-1]])* pane_scale
+    #wts[np.isnan(wts)] = 0;
+    faces = []
+    # Loop over different distances in DepthDiv ...
+    for iD in range(nD): #= 1:nD
+        # ...and vectors in normBinCenters
+        for iP,bc in enumerate(bin_centers):
+            #ct = iP+iD*len(bin_centers)
+            xyz = -dst_spacing*bc - DstAdd*iD;
+            # re-set direction of normal vector to make coordinate conventions consistent
+            xyz = xyz*np.array([1,-1,1])
+            # rotate patch by camera transformation
+            cam_mat = vector2camMatrix(bc)
+            patch_rot = cam_mat.dot(base_patch.T).T
+            patch_rot_shift = xyz[None,:]+patch_rot
+            # add patch to list of faces
+            faces.append(patch_rot_shift)
+    if params['sky_channel']:
+        bc = np.array([0, 1, 0])
+        xyz = -dst_spacing * bc - DstAdd*nD
+        xyz = xyz * np.array([1, -1, 1])
+        cam_mat = vector2camMatrix(bc)
+        patch_rot = cam_mat.dot(base_patch.T * 3).T
+        patch_rot_shift = xyz[None,:] + patch_rot
+        faces.append(patch_rot_shift)
+    ## -- Set face colors -- ##
+    norm = colors.Normalize(*mn_mx)
+    cmapper = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+    cols = cmapper.to_rgba(wts)
+    ## -- Plot poly collection -- ##
+    if ax is None:
+        fig = plt.figure()
+        ax = plt.axes(projection='3d')
+    else:
+        fig = ax.get_figure()
+    #print("faces are %d long"%len(faces))
+    #print("colors are %d long"%len(cols))
+    nfaces = len(faces)
+    for ii,ff in enumerate(faces):
+        polys = Poly3DCollection([ff], linewidths=lw)
+        polys.set_facecolors([cols[ii]])
+        polys.set_edgecolors([0.5, 0.5, 0.5])
+        ax.add_collection3d(polys)
+    xl,yl,zl = zip(np.min(np.vstack([f for f in faces]),axis=0),
+                   np.max(np.vstack([f for f in faces]),axis=0))
+    plt.setp(ax,xlim=xl,ylim=yl,zlim=zl)
+    ax.view_init(azim=azim,elev=elev)
+    if show_axis:
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+    else:
+        ax.set_axis_off()
+    if cbar:
+        fig.colorbar(polys, ax=ax)
+
+def add_border(col,im,lw=4,is_trim=False):
+    """Add a border around an image."""
+    L,R,T,B = im.get_extent()
+    ax = im.get_axes()
+    # Translate extent to bounding box
+    ww =[[L, B], [R, T]]
+    bb = mtransforms.Bbox(ww)
+    offset = np.abs(bb.width)*.01
+    p_fancy = FancyBboxPatch((bb.xmin, bb.ymin),
+                             abs(bb.width), abs(bb.height),
+                             boxstyle="round,pad=%0.2f"%(offset),
+                             fc="none",
+                             ec=col, 
+                             lw=lw,
+                             zorder=4)
+    ax.add_patch(p_fancy)
+    if is_trim:
+        plt.axis('off')
+        plt.setp(ax,ylim=(T+lw*offset/2.,B-lw*offset/2.),xlim=(L-lw*offset/2.,R+lw*offset/2.))
+        
