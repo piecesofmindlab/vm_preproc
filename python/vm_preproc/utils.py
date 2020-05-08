@@ -277,8 +277,10 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                 stim = inpt.load(idx=idx, variable_name=kws['variable_name'])
             else:
                 stim = inpt.load(idx=idx)
-            # Function must return single array output for this to work
-            out = fn(stim, **kwargs)
+            if isinstance(stim, dict):
+                out = fn(**stim, **kwargs)
+            else:        
+                out = fn(stim, **kwargs)
             if isinstance(out, tuple) and (len(out) > 1):
                 if multiple_outputs in (False, 'discard', None):
                     # Keep only first output
@@ -296,7 +298,10 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                 if ibatch==0:
                     # For first batch, create dataset
                     # First, check for DOWNSAMPLING of data:
-                    n_frames_batch = stim.shape[0]
+                    if isinstance(stim, dict):
+                        n_frames_batch = list(stim.values())[0].shape[0]
+                    else: 
+                        n_frames_batch = stim.shape[0]
                     n_frames_output = out.shape[0]
                     if n_frames_output < n_frames_batch:
                         # If present, compute downsampling factor
