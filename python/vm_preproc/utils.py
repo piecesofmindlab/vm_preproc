@@ -297,22 +297,32 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                 # Write hdf
                 if ibatch==0:
                     # For first batch, create dataset
-                    # First, check for DOWNSAMPLING of data:
+                    # First, check for downsampling of data:
                     if isinstance(stim, dict):
                         n_frames_batch = list(stim.values())[0].shape[0]
                     else: 
                         n_frames_batch = stim.shape[0]
                     n_frames_output = out.shape[0]
                     if n_frames_output < n_frames_batch:
-                        # If present, compute downsampling factor
-                        ds_factor = n_frames_batch / n_frames_output
-                        tolerance = 1e-6
-                        if ds_factor % 1 > tolerance:
-                            raise ValueError("Downsampling by non-integer factor detected; I die now.")
-                        n_frames_out = int(n_frames / ds_factor)
+                        if 'extra_frame_threshold' in kwargs:
+                            print("Suboptimal code follows -you should manage your stimulus to have an even number of TRs")
+                            ds_factor = int(kwargs['input_hz'] / kwargs['output_hz'])
+                            extra_frames = n_frames % ds_factor
+                            if extra_frames > kwargs['extra_frame_threshold']:
+                                to_add = 1
+                            else:
+                                to_add = 0
+                            n_frames_out = int(n_frames / ds_factor) + to_add
+                        else:
+                            # If present, compute downsampling factor
+                            ds_factor = n_frames_batch / n_frames_output
+                            tolerance = 1e-6
+                            if ds_factor % 1 > tolerance:
+                                raise ValueError("Downsampling by non-integer factor detected; I die now.")
+                            n_frames_out = int(n_frames / ds_factor)
                     else:
                         n_frames_out = n_frames
-                    dshape = (n_frames_out, *out.shape[1:])                    
+                    dshape = (n_frames_out, *out.shape[1:])
                     outpt.create_dataset('data', dtype=out.dtype, shape=dshape, compression='gzip')
                 outpt['data'][idx[0]:idx[1]] = out
             else:
