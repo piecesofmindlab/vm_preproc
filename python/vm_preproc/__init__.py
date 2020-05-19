@@ -11,6 +11,7 @@ from . import image
 from . import normals
 from . import anonymize
 from . import motion_energy
+from . import gridlike_code
 
 __all__ = ['options', 
 			'utils', 
@@ -18,7 +19,8 @@ __all__ = ['options',
 			'image',
 			'anonymize', 
 			'normals', 
-			'motion_energy']
+			'motion_energy'
+			'gridlike_code']
 
 # Soft imports of torch / GPU dependent code
 try:

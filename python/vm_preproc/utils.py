@@ -311,7 +311,6 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                     if n_frames_output < n_frames_batch:
                         if 'extra_frame_threshold' in kwargs:
                             print("Suboptimal code follows -you should manage your stimulus to have an even number of TRs")
-                            # Would be good to verify that this works in all cases...
                             ds_factor = int(np.floor(kwargs['input_hz'] / kwargs['output_hz']))
                             print("Computed downsampling factor is: {:0.3f}".format(ds_factor))
                             extra_frames = n_frames % ds_factor
@@ -319,7 +318,7 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                                 to_add = 1
                             else:
                                 to_add = 0
-                            n_frames_out = int(n_frames / ds_factor) + to_add
+                            n_frames_out = n_frames // ds_factor + to_add
                             print("Computed frames out is: {:0.3f}".format(n_frames_out))
                         else:
                             # If present, compute downsampling factor
