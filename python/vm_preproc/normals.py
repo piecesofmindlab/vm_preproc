@@ -17,6 +17,8 @@ except:
     import cv3 as cv
 from . import utils 
 
+import tqdm
+
 # Colormap(s)
 from matplotlib.colors import LinearSegmentedColormap
 RET = LinearSegmentedColormap.from_list('RET', 
@@ -82,6 +84,7 @@ def compute_distance_orientation_bins(normals,
                                       n_bins_x=1,
                                       n_bins_y=1,
                                       ori_norm=2,
+                                      progress_bar=tqdm.tqdm,
                                       ):
     """Compute % of pixels in specified distance & orientation bins
 
@@ -160,12 +163,12 @@ def compute_distance_orientation_bins(normals,
         n_dims = n_tiles * n_dist_bins * n_norm_bins
 
     output = np.zeros((n_ims, n_dims)) * np.nan
-    for iS in range(n_ims):
-        if n_ims>200:
-            if iS % 200 == 0:
-                print("Done to image %d / %d"%(iS, n_ims)) #progressdot(iS,200,2000,n_ims)
-        elif (n_ims < 200) and (n_ims > 1):
-            print('computing Scene Depth Normals...')
+    for iS in progress_bar(range(n_ims)):
+        #if n_ims>200:
+        #    if iS % 200 == 0:
+        #        print("Done to image %d / %d"%(iS, n_ims)) #progressdot(iS,200,2000,n_ims)
+        #elif (n_ims < 200) and (n_ims > 1):
+        #    print('computing Scene Depth Normals...')
         # Pull single image for preprocessing
         z = distance[iS]
         n = normals[iS]

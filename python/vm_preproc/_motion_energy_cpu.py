@@ -471,7 +471,7 @@ def mk_3d_gabor(xyt,
 	Same method as Nishimoto, et al., 2011.
 	'''
 
-	szx, szy, szt = np.asarray(xyt).astype(np.float)
+	szx, szy, szt = np.asarray(xyt).astype(np.int)
 
 	dx = np.linspace(0,aspect_ratio,szx, endpoint=True)
 	dy = np.linspace(0,1,szy, endpoint=True)

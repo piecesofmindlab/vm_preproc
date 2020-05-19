@@ -172,14 +172,14 @@ def compute_filter_responses(stimulus,
     return channels
 
 
-from .motion_energy_cpu import mk_spatiotemporal_gabor
-from .motion_energy_cpu import mk_moten_pyramid_params
+from ._motion_energy_cpu import mk_spatiotemporal_gabor
+from ._motion_energy_cpu import mk_moten_pyramid_params
 
 ##############################
 # core functionality
 ##############################
 
-from .motion_energy_cpu import mk_3d_gabor
+from ._motion_energy_cpu import mk_3d_gabor
 from numbers import Number
 
 def dotspatial_frames(spatial_gabor_sin, spatial_gabor_cos,

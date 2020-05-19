@@ -2,6 +2,7 @@
 import os
 import six
 import h5py
+import tqdm
 import inspect
 import file_io
 import numpy as np
@@ -201,7 +202,10 @@ class DataSet(object):
             if idx is None:
                 return self._data
             else:
-                return self._data[idx[0]:idx[1]]
+                if isinstance(self._data, dict):
+                    return dict((k, v[idx[0]:idx[1]]) for k, v in self._data.items())
+                else:
+                    return self._data[idx[0]:idx[1]]
 
     @property
     def n_frames(self):
@@ -210,18 +214,18 @@ class DataSet(object):
             if self._data is None:
                 fnm, ext = os.path.splitext(self.fpath)
                 sz = file_io.var_size(self.fpath, variable_name=self.variable_name)
-                if ext in ('.mp4',):
-                    frames = sz[-1]
-                else:
-                    frames = sz[0]
+                frames = sz[0]
             else:
                 # Assume (y, x, [c], t) array
-                frames = self._data.shape[0]
+                if isinstance(self._data, dict):
+                    frames = list(self._data.values())[0].shape[0]
+                else:
+                    frames = self._data.shape[0]
             self._n_frames = frames
         return self._n_frames
     
 
-def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='discard', **kwargs):
+def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='discard', progress_bar=tqdm.tqdm, **kwargs):
     """Cycle through a file too long to load into memory at once
     
     Parameters
@@ -277,6 +281,7 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                 stim = inpt.load(idx=idx, variable_name=kws['variable_name'])
             else:
                 stim = inpt.load(idx=idx)
+            # TODO here: add progress_bar kwarg if this fn supports it
             if isinstance(stim, dict):
                 out = fn(**stim, **kwargs)
             else:        
@@ -306,13 +311,16 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                     if n_frames_output < n_frames_batch:
                         if 'extra_frame_threshold' in kwargs:
                             print("Suboptimal code follows -you should manage your stimulus to have an even number of TRs")
-                            ds_factor = int(kwargs['input_hz'] / kwargs['output_hz'])
+                            # Would be good to verify that this works in all cases...
+                            ds_factor = int(np.floor(kwargs['input_hz'] / kwargs['output_hz']))
+                            print("Computed downsampling factor is: {:0.3f}".format(ds_factor))
                             extra_frames = n_frames % ds_factor
                             if extra_frames > kwargs['extra_frame_threshold']:
                                 to_add = 1
                             else:
                                 to_add = 0
                             n_frames_out = int(n_frames / ds_factor) + to_add
+                            print("Computed frames out is: {:0.3f}".format(n_frames_out))
                         else:
                             # If present, compute downsampling factor
                             ds_factor = n_frames_batch / n_frames_output
@@ -321,10 +329,14 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                                 raise ValueError("Downsampling by non-integer factor detected; I die now.")
                             n_frames_out = int(n_frames / ds_factor)
                     else:
+                        ds_factor = 1.0
                         n_frames_out = n_frames
                     dshape = (n_frames_out, *out.shape[1:])
                     outpt.create_dataset('data', dtype=out.dtype, shape=dshape, compression='gzip')
-                outpt['data'][idx[0]:idx[1]] = out
+                
+                oidx = [int(st / ds_factor), int(st / ds_factor) + n_frames_output]
+                print(oidx)
+                outpt['data'][oidx[0]:oidx[1]] = out
             else:
                 # Concatenate results as array
                 outpt.append(out)
