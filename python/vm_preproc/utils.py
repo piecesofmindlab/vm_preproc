@@ -5,6 +5,7 @@ import h5py
 import tqdm
 import inspect
 import file_io
+import imageio
 import numpy as np
 from scipy.interpolate import interp1d
 
@@ -225,7 +226,14 @@ class DataSet(object):
         return self._n_frames
     
 
-def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='discard', progress_bar=tqdm.tqdm, **kwargs):
+def batch_run(fn, inpt, 
+    batch_size=None, 
+    output_file=None, 
+    multiple_outputs='discard', 
+    progress_bar=tqdm.tqdm, 
+    output_fps=None,
+    output_resolution=None,
+    **kwargs):
     """Cycle through a file too long to load into memory at once
     
     Parameters
@@ -258,7 +266,16 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
         fnm, ext = os.path.splitext(output_file)
         if ext in ('.mp4',):
             # initialize video writer object
-            outpt = file_io.VideoEncoderFFMPEG(output_file) 
+            if (output_fps is None) and (output_resolution is None):
+                # try to read input file; assume fps & size are same
+                if '.mp4' in inpt.fpath:
+                    vid = imageio.get_reader(inpt.fpath,  'ffmpeg') 
+                    meta = vid.get_meta_data()
+                    output_fps = meta['fps']
+                    output_resolution = meta['size'][::-1]
+                else:
+                    raise ValueError("Please specify `output_fps` for movie")
+            outpt = file_io.VideoEncoderFFMPEG(output_file, output_resolution, output_fps) 
             output_option = 'video'
         elif ext in file_io.HDF_EXTENSIONS:
             output_option = 'hdf'
@@ -290,10 +307,12 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                 if multiple_outputs in (False, 'discard', None):
                     # Keep only first output
                     out = out[0]
+                elif isinstance(multiple_outputs, (list, tuple)):
+                    assert len(out) == len(multiple_outputs)
+                    out = dict((k, v) for k, v in zip(multiple_outputs, out))
                 else:
-                    raise NotImplementedError('Cannot yet handle multiple outputs from file')
-                    # Perhaps a handle_outputs() function here, e.g.
-                    # out, params_etc = handle_outputs(out)
+                    # ASSUME integer index; needs check / assertion statement here
+                    out = out[multiple_outputs]
             if output_option=='video':
                 # Write video
                 for o_ in out:
@@ -310,16 +329,10 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                     n_frames_output = out.shape[0]
                     if n_frames_output < n_frames_batch:
                         if 'extra_frame_threshold' in kwargs:
-                            print("Suboptimal code follows -you should manage your stimulus to have an even number of TRs")
                             ds_factor = int(np.floor(kwargs['input_hz'] / kwargs['output_hz']))
-                            print("Computed downsampling factor is: {:0.3f}".format(ds_factor))
                             extra_frames = n_frames % ds_factor
-                            if extra_frames > kwargs['extra_frame_threshold']:
-                                to_add = 1
-                            else:
-                                to_add = 0
+                            to_add = 1 if extra_frames > kwargs['extra_frame_threshold'] else 0
                             n_frames_out = n_frames // ds_factor + to_add
-                            print("Computed frames out is: {:0.3f}".format(n_frames_out))
                         else:
                             # If present, compute downsampling factor
                             ds_factor = n_frames_batch / n_frames_output
@@ -330,11 +343,11 @@ def batch_run(fn, inpt, batch_size=None, output_file=None, multiple_outputs='dis
                     else:
                         ds_factor = 1.0
                         n_frames_out = n_frames
+                    # Create dataset output
                     dshape = (n_frames_out, *out.shape[1:])
                     outpt.create_dataset('data', dtype=out.dtype, shape=dshape, compression='gzip')
                 
                 oidx = [int(st / ds_factor), int(st / ds_factor) + n_frames_output]
-                print(oidx)
                 outpt['data'][oidx[0]:oidx[1]] = out
             else:
                 # Concatenate results as array

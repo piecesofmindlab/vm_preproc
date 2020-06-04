@@ -12,6 +12,7 @@ from . import normals
 from . import anonymize
 from . import motion_energy
 from . import gridlike_code
+from . import marker_detection
 
 __all__ = ['options', 
 			'utils', 
@@ -19,7 +20,8 @@ __all__ = ['options',
 			'image',
 			'anonymize', 
 			'normals', 
-			'motion_energy'
+			'motion_energy',
+			'marker_detection',
 			'gridlike_code']
 
 # Soft imports of torch / GPU dependent code
