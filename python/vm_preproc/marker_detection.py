@@ -1,8 +1,6 @@
 import numpy as np
-import pandas as pd
 import cv2 as cv
 import tqdm
-import time
 
 
 def detect_checkerboard(timestamps, video_data, checkerboard_size=(6, 8), scale=None, progress_bar=tqdm.tqdm):
@@ -10,34 +8,27 @@ def detect_checkerboard(timestamps, video_data, checkerboard_size=(6, 8), scale=
 
     """
     rows, cols = checkerboard_size
-    if np.ndim(video_data) == 3:
-        vid_color = 'gray'
-        n_frames, vdim, hdim = video_data.shape
-    elif np.ndim(video_data) == 4:
-        vid_color = 'color'
-        n_frames, vdim, hdim, cdim = video_data.shape
-    else:
-        raise ValueError("`video_data` input must be a 3 or 4 dimensional array (")
+    n_frames, vdim, hdim = video_data.shape[:3]
     
     times = [] # frame timestamps for detected keypoints
     locations = []  # 2d points in image plane.
     mean_locations = [] # Mean 2d points in image plane
 
-    # termination criteria
+    # termination criteria: Make inputs?
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-
-    for frame_time, frame in progress_bar(zip(timestamps, video_data)):
-        if vid_color == 'color':
+    n_iter = min([len(timestamps), len(video_data)])
+    for frame_time, frame in progress_bar(zip(timestamps, video_data), total=n_iter):
+        if np.ndim(video_data) == 4:
+            # Color image; remove color
+            # TODO: add option for BGR image?
             frame = cv.cvtColor(frame, cv.COLOR_RGB2GRAY)
         if scale is not None:
             scale_x, scale_y = scale
             frame = cv.resize(frame, None, fx=scale_x, fy=scale_y)
             vdim, hdim = frame.shape[:2]
-        t0 = time.time()
         # Find the chess board corners
-        ret, corners = cv.findChessboardCorners(frame, (6, 8), None)
-
+        ret, corners = cv.findChessboardCorners(frame, checkerboard_size, None)
         # If found, add object points, image points (after refining them)
         if ret:
             times.append(frame_time)
