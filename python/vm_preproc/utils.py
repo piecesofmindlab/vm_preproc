@@ -230,7 +230,6 @@ def batch_run(fn, inpt,
     batch_size=None, 
     output_file=None, 
     multiple_outputs='discard', 
-    progress_bar=tqdm.tqdm, 
     output_fps=None,
     output_resolution=None,
     **kwargs):
@@ -240,11 +239,30 @@ def batch_run(fn, inpt,
     ----------
     fn : function to call
         if a string, then fn should be the full modular path to the 
-        function ()
+        function
+    inpt : string, array-like, or DataSet
+        The input to be processed. 
+        A string can be used to specify a file path to e.g. a movie or hdf file. 
+        An array input should have time on the first axis
+        Strings and arrays are both passed to vmp.utils.DataSet to create 
+        iterable objects
+    output_file : string or None
+        If a string is provided, output is written the file specified by the string
+        Specified files currently must be .hdf or .mp4
+    multiple_outputs : string
+        Specifies how to handle multiple out puts from `fn`. Currently WIP; only 
+        currently available option is to take first output ('discard' the rest)
+    output_fps : scalar or None
+        if output is an mp4, specifies frame rate
+    output_resolution : tuple or None
+        if output is an mp4, specifies spatial resolution
+    kwargs are all mapped to the call to `fn` 
 
     Notes
     -----
-    TO DO: parallelize
+    TO DO: processing of large movie files in multiple batches should be embarassingly
+    parallel; thus, they could & should be distributed over multiple threads or jobs. 
+    TO DO: 
     """
     # Get function to call
     if isinstance(fn, six.string_types):
@@ -285,7 +303,7 @@ def batch_run(fn, inpt,
             raise ValueError('Unsupported output type.')
     else:
         # TO DO: Preallocate...?
-        # outpt = np.array(n_frames)
+        # outpt = np.array(n_frames, ...)
         outpt = []
 
     try:
@@ -298,7 +316,6 @@ def batch_run(fn, inpt,
                 stim = inpt.load(idx=idx, variable_name=kws['variable_name'])
             else:
                 stim = inpt.load(idx=idx)
-            # TODO here: add progress_bar kwarg if this fn supports it
             if isinstance(stim, dict):
                 out = fn(**stim, **kwargs)
             else:        
