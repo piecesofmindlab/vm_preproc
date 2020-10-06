@@ -8,7 +8,7 @@ import file_io
 import imageio
 import numpy as np
 from scipy.interpolate import interp1d
-
+from functools import reduce
 
 ### --- Stats functions --- ###
 def norm_std_mean(S, mean=None, std=None, size_thresh=None):
@@ -164,6 +164,18 @@ def get_default_kwargs(fn):
     kws = inspect.getargspec(fn)
     defaults = dict(zip(kws.args[-len(kws.defaults):], kws.defaults))
     return defaults
+
+
+def list_reduce(my_list): 
+    """Convenience function to reduce a list of lists to a single list
+
+    Parameters
+    ----------
+    my_list : list
+        list of lists to be reduced to a single list
+    """
+    return reduce(lambda x, y: x+y, my_list)
+
     
 def get_function(function_name):
     """Load a function to a variable by name
@@ -232,6 +244,7 @@ def batch_run(fn, inpt,
     multiple_outputs='discard', 
     output_fps=None,
     output_resolution=None,
+    batch_combine_fn=np.vstack,
     **kwargs):
     """Cycle through a file too long to load into memory at once
     
@@ -370,7 +383,7 @@ def batch_run(fn, inpt,
                 # Concatenate results as array
                 outpt.append(out)
         if output_file is None:
-            return np.vstack(outpt)
+            return batch_combine_fn(outpt)
         else: 
             if output_option=='hdf':
                 outpt.close()

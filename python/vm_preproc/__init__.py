@@ -13,6 +13,7 @@ from . import anonymize
 from . import motion_energy
 from . import gridlike_code
 from . import marker_detection
+from . import openpose
 
 __all__ = ['options', 
 			'utils', 
@@ -22,7 +23,8 @@ __all__ = ['options',
 			'normals', 
 			'motion_energy',
 			'marker_detection',
-			'gridlike_code']
+			'gridlike_code',
+			'openpose']
 
 # Soft imports of torch / GPU dependent code
 try:
