@@ -9,7 +9,7 @@ from . import options
 from . import general
 from . import image
 from . import normals
-from . import anonymize
+#from . import anonymize # Crappy opencv version bug
 from . import motion_energy
 from . import gridlike_code
 from . import marker_detection

@@ -3,6 +3,7 @@ import os
 import six
 import h5py
 import tqdm
+import time
 import inspect
 import file_io
 import imageio
@@ -215,10 +216,7 @@ class DataSet(object):
             if idx is None:
                 return self._data
             else:
-                if isinstance(self._data, dict):
-                    return dict((k, v[idx[0]:idx[1]]) for k, v in self._data.items())
-                else:
-                    return self._data[idx[0]:idx[1]]
+                return self._data[idx[0]:idx[1]]
 
     @property
     def n_frames(self):
@@ -230,13 +228,53 @@ class DataSet(object):
                 frames = sz[0]
             else:
                 # Assume (y, x, [c], t) array
-                if isinstance(self._data, dict):
-                    frames = list(self._data.values())[0].shape[0]
-                else:
-                    frames = self._data.shape[0]
+                frames = self._data.shape[0]
             self._n_frames = frames
         return self._n_frames
+
+class MultiPartDataSet(object):
+    """loader for multi-part data for functions with multiple inputs"""
+    def __init__(self, fpaths=None, variable_names=None, data=None):
+        """All inputs are dicts of {variable_name:value}
+
+        You must specify EITHER fpaths and variable_names (keys must match)
+        OR data, with all values specified.
+
+
+        Parameters:
+        fpaths
+        """
+        self.fpaths = fpaths
+        self._n_frames = None
+        self._data = data
+        if variable_names is None:
+            if data is None:
+                # Rely on fpaths to be a dict
+                assert isinstance(fpaths, dict), '`fpaths` input must be a dict if data is None!'
+                self.variable_names = dict((k, None) for k in fpaths.keys())
+            else:
+                # Rely on data to be a dict
+                assert isinstance(data, dict), '`data` input must be a dict!'
+                self.variable_names = dict((k, None) for k in data.keys())
+        else:
+            self.variable_names = variable_names
     
+    def load(self, idx=None):
+        if self._data is None:
+            return dict((k, file_io.load_array(self.fpaths[k], variable_name=self.variable_names[k], idx=idx)) for k in self.fpaths.keys())
+        else:
+            return dict((k, v[idx[0]:idx[1]]) for k, v in self._data.items())
+    
+    @property
+    def n_frames(self):
+        if self._n_frames is None:
+            if self._data is None:
+                frames = dict((k, file_io.var_size(self.fpaths[k], variable_name=self.variable_names[k])[0]) for k in self.fpaths.keys())
+            else:
+                frames = dict((k, v.shape[0]) for k, v in self._data.items())
+            self._n_frames = frames
+        return self._n_frames
+
 
 def batch_run(fn, inpt, 
     batch_size=None, 
@@ -245,6 +283,9 @@ def batch_run(fn, inpt,
     output_fps=None,
     output_resolution=None,
     batch_combine_fn=np.vstack,
+    sleep_time=0.3,
+    #first_frame=None, # TO DO?
+    #last_frame=None, # TO DO? 
     **kwargs):
     """Cycle through a file too long to load into memory at once
     
@@ -269,33 +310,75 @@ def batch_run(fn, inpt,
         if output is an mp4, specifies frame rate
     output_resolution : tuple or None
         if output is an mp4, specifies spatial resolution
+    batch_combine_fn : function
+        function to use to combine outputs of multiple batches. Must take a list
+        as input, do something to it to convert it to the desired output. Two main
+        options are `np.vstack` (default) to concatenate arrays computed by each 
+        batch along their first dimension and `list_reduce` to concatenate multiple
+        lists into a single list.
+    sleep_time : scalar 
+        Time in seconds to sleep between batches 
+    
+    Other Parameters
+    ----------------
     kwargs are all mapped to the call to `fn` 
 
     Notes
     -----
     TO DO: processing of large movie files in multiple batches should be embarassingly
     parallel; thus, they could & should be distributed over multiple threads or jobs. 
-    TO DO: 
+    TO DO: Implement running on only a subset of input frames, maybe.
+    TO DO: compute batch size based on memory use, given size of array input
     """
+    
+    ## Handle inputs
     # Get function to call
     if isinstance(fn, six.string_types):
         fn = get_function(fn)
-    # Get full n frames of video, from video module
+    # Manage input type, map to DataSet or MultiPartDataSet class if necessary
     if not hasattr(inpt, 'load'):
-        if isinstance(inpt, six.string_types):
-            inpt = DataSet(inpt)
+        if isinstance(inpt, dict):
+            # Deal with multiple inputs
+            inpt = MultiPartDataSet(**inpt)
         else:
-            inpt = DataSet(None, data=inpt)
-        #raise ValueError('`inpt` must be either a string filepath or a class with a load method')
+            # Deal with single input
+            if isinstance(inpt, six.string_types):
+                inpt = DataSet(inpt)
+            else:
+                inpt = DataSet(None, data=inpt)
+    # Get full number of frames for video (or other) input
     n_frames = inpt.n_frames
+    if isinstance(n_frames, dict):
+        n_fr_ = np.array(list(n_frames.values()))
+        assert np.all(n_fr_[0]==n_fr_[1:]), 'Cannot handle different-size inputs for multipart datasets yet!'
+        n_frames = list(n_frames.values())[0]
+    # Compute number of batches to run
     if batch_size is None:
         batch_size = n_frames
+    elif batch_size == 'auto':
+        #raise NotImplemented('Not Yet!')
+        # bytes for different data types
+        dtype_bytes = dict(uint8=1,
+            float32=4, 
+            float64=8,
+            )
+        # Load first frame
+        tmp = inpt.load(idx=(0, 1))
+        if isinstance(tmp, dict):
+            n_bytes = np.sum([np.prod(v.shape) * dtype_bytes[str(v.dtype)] for v in tmp.values()])
+        else:
+            n_bytes = np.prod(tmp.shape)
+        # Make me an input, or a part of batch size, or whatever
+        max_batch_bytes = 1024**3 * 4 # 4 GB
+        batch_size = int(np.floor(max_batch_bytes / n_bytes))
     n_batches = int(np.ceil(n_frames / batch_size))
-    print('Running %d batches'%n_batches)
+
+    ## Handle output options: write to file (mp4 or hdf) or save to array
     output_option = 'array'
     if output_file is not None:
         fnm, ext = os.path.splitext(output_file)
         if ext in ('.mp4',):
+            output_option = 'video'
             # initialize video writer object
             if (output_fps is None) and (output_resolution is None):
                 # try to read input file; assume fps & size are same
@@ -307,7 +390,6 @@ def batch_run(fn, inpt,
                 else:
                     raise ValueError("Please specify `output_fps` for movie")
             outpt = file_io.VideoEncoderFFMPEG(output_file, output_resolution, output_fps) 
-            output_option = 'video'
         elif ext in file_io.HDF_EXTENSIONS:
             output_option = 'hdf'
             outpt = h5py.File(output_file, mode='w')
@@ -319,20 +401,28 @@ def batch_run(fn, inpt,
         # outpt = np.array(n_frames, ...)
         outpt = []
 
+    # Try loop to make sure output file is not left dangling & open
+    # Consider replacing with `with` call?
     try:
         kws = get_default_kwargs(inpt.load)
+        print('Running %d batches'%n_batches)
         for ibatch in range(n_batches):
+            print(f"Running batch {ibatch} / {n_batches}")
+            # Get indices for this batch
             st = ibatch * batch_size
             fin = np.min([(ibatch + 1) * batch_size, n_frames])
             idx = (st, fin)
+            # Load input
             if 'variable_name' in kws:
                 stim = inpt.load(idx=idx, variable_name=kws['variable_name'])
             else:
                 stim = inpt.load(idx=idx)
+            # Run function on this batch
             if isinstance(stim, dict):
                 out = fn(**stim, **kwargs)
             else:        
                 out = fn(stim, **kwargs)
+            # Store output
             if isinstance(out, tuple) and (len(out) > 1):
                 if multiple_outputs in (False, 'discard', None):
                     # Keep only first output
@@ -343,12 +433,13 @@ def batch_run(fn, inpt,
                 else:
                     # ASSUME integer index; needs check / assertion statement here
                     out = out[multiple_outputs]
+            # Map output to file if desired
             if output_option=='video':
-                # Write video
+                # Write frames to video writer object
                 for o_ in out:
                     outpt.write(o_)
             elif output_option=='hdf':
-                # Write hdf
+                # Write indices to hdf file object
                 if ibatch==0:
                     # For first batch, create dataset
                     # First, check for downsampling of data:
@@ -380,8 +471,11 @@ def batch_run(fn, inpt,
                 oidx = [int(st / ds_factor), int(st / ds_factor) + n_frames_output]
                 outpt['data'][oidx[0]:oidx[1]] = out
             else:
-                # Concatenate results as array
+                # No file output; concatenate results as array
                 outpt.append(out)
+            # Stall (maybe (?) helps some sub-processes complete)
+            time.sleep(sleep_time)
+        # Having finished batches, manage output
         if output_file is None:
             return batch_combine_fn(outpt)
         else: 
