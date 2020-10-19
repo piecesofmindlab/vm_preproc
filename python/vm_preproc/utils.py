@@ -350,8 +350,14 @@ def batch_run(fn, inpt,
     n_frames = inpt.n_frames
     if isinstance(n_frames, dict):
         n_fr_ = np.array(list(n_frames.values()))
-        assert np.all(n_fr_[0]==n_fr_[1:]), 'Cannot handle different-size inputs for multipart datasets yet!'
-        n_frames = list(n_frames.values())[0]
+        if not np.all(n_fr_[0]==n_fr_[1:]):
+            mx_diff = np.max(n_fr[1:] - n_fr_[0])
+            if mx_diff == 1:
+                # Off-by-one error. Shit. Maybe disallow. for now, allow... (SHADY)
+                pass # See min below
+            else:
+                raise ValueError('Number of frames for different parts of input to batch_run does not match!')
+        n_frames = min(list(n_frames.values()))
     # Compute number of batches to run
     if batch_size is None:
         batch_size = n_frames
