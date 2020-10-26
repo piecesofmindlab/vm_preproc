@@ -209,7 +209,7 @@ def dotspatial_frames(spatial_gabor_sin, spatial_gabor_cos,
     if isinstance(mask, Number):
         mask = torch.abs(gabors).sum(0) > mask
     else:
-        assert mask.dtype == torch.uint8
+        assert mask.dtype == torch.bool
 
     gabor_prod = torch.mm(gabors[:,mask].squeeze(),
                           stimuli.t()[mask].squeeze()).t()

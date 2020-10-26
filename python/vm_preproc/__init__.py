@@ -9,9 +9,11 @@ from . import options
 from . import general
 from . import image
 from . import normals
-from . import anonymize
+#from . import anonymize # Crappy opencv version bug
 from . import motion_energy
 from . import gridlike_code
+from . import marker_detection
+from . import openpose
 
 __all__ = ['options', 
 			'utils', 
@@ -19,8 +21,10 @@ __all__ = ['options',
 			'image',
 			'anonymize', 
 			'normals', 
-			'motion_energy'
-			'gridlike_code']
+			'motion_energy',
+			'marker_detection',
+			'gridlike_code',
+			'openpose']
 
 # Soft imports of torch / GPU dependent code
 try:
