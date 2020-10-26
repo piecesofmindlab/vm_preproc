@@ -21,7 +21,7 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
 
     Returns 
     -------
-    Spreproc : Preprocessed stimulus
+    output : Preprocessed stimulus
     params : filled-out param struct
     """
 
@@ -36,7 +36,7 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
     #circ_dist = @(a,b,mx) min(abs(a-b),mx-abs(a-b));
 
     # Set up bins in Fourier space
-    y, x, N = data.shape
+    N, y, x = data.shape
     # Compute pixels per degree for this size image
     if x != y:
         raise ValueError("Can't handle non-square images yet!")
@@ -65,7 +65,7 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
     Sf = np.sqrt(np.abs(np.fft.fft2(data)))
     # Lame; must be a better way to do this...
     for ii in range(N): #= 1:N:
-        Sf[:,:,ii] = np.fft.fftshift(Sf[:,:,ii])
+        Sf[ii] = np.fft.fftshift(Sf[ii])
 
     # Get DC
     centerx = int(np.floor(x / 2) + 1)
@@ -74,7 +74,7 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
     # Mask out DC
     #Sf[centery, centerx, :] = np.nan
     #Sf = reshape(Sf,[],N);
-    Sf = Sf.reshape(-1, N) # unclear if this does the thing.
+    Sf = Sf.reshape(N, -1).T # unclear if this does the thing.
 
     if normalize_by_image is not False:
         if normalize_by_image == 'zscore':
@@ -103,8 +103,8 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
             gm = np.nanmean(Sf, axis=0);
             Sf -= gm
             contrast = gm
-    # Preallocate Spreproc
-    Spreproc = np.zeros((N, len(angle_bin_centers), len(sf_bin_edges) - 1))
+    # Preallocate output
+    output = np.zeros((N, len(angle_bin_centers), len(sf_bin_edges) - 1))
     # For visualization
     if make_bin_image:
         bin_image = np.zeros(data.shape[:2])
@@ -129,14 +129,14 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
             Idx = aidx & sfidx
             #tmp = Sf(Idx(:),:);
             tmp = Sf[Idx.flatten(),:]
-            Spreproc[:, i, j] = np.nanmean(tmp, axis=0) #-gm;
+            output[:, i, j] = np.nanmean(tmp, axis=0) #-gm;
             # For display
             if make_bin_image:
                 bin_image[Idx] = ct
                 ct = ct+1;
 
-    # Reshape Spreproc
-    Spreproc = Spreproc.reshape(N, -1) #reshape(Spreproc,N,[]);
+    # Reshape output
+    output = output.reshape(N, -1) #reshape(output,N,[]);
     if normalize_by_sf:
         for isf in range(len(sf_bin_edges) - 1): #= 1:size(params.sfreq_bins,1)
             #sf = params.sfreq_bins(isf,1);
@@ -144,11 +144,11 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
             #idx = params.bin_params(2,:)==sf;
             idx = params.bin_params[2,:]==sf
             # divide by L2 norm for each spaital frequency
-            n = np.sqrt(np.sum(Spreproc[:,idx]**2, axis=1))
-            Spreproc[:,idx] /= n
+            n = np.sqrt(np.sum(output[:,idx]**2, axis=1))
+            output[:,idx] /= n
 
     if keep_contrast_channel:
-        Spreproc = np.hstack([contrast[:, np.newaxis], Spreproc])
+        output = np.hstack([contrast[:, np.newaxis], output])
 
     params = dict(angle_bin_centers=angle_bin_centers,
                   angle_bin_widths=angle_bin_widths,
@@ -158,4 +158,4 @@ def compute_fourier_bins(data, angle_bin_centers=(0, 45, 90, 135), angle_bin_wid
                   normalize_by_image=normalize_by_image, 
                   )
     # Output
-    return Spreproc, params
+    return output, params
