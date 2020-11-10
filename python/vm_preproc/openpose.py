@@ -40,15 +40,16 @@ right_feet_fill_idxs = (14,20,19,21,)
 # Code to generate keypoint jsons should be something like this:
 # ./build/examples/openpose/openpose.bin --video /hdd01/hdd_space/stimuli/VEDB/2020_08_23_22_27_12.mp4 --write_json /hdd01/matthew_sync/space/matt/BioMotion/features/VEDB/openpose/keypoints/ --face --hand --part_candidates --net_resolution 240x240 && ./build/examples/openpose/openpose.bin --video /hdd01/hdd_space/stimuli/VEDB/2020_09_14_13_54_11.mp4 --write_json /hdd01/matthew_sync/space/matt/BioMotion/features/VEDB/openpose/keypoints/ --face --hand --part_candidates --net_resolution 240x240
 
-def kpts_to_parts(keypoints_dir, image_dims):
-    jsons = sorted(glob.glob(keypoints_dir))
+def kpts_to_parts(keypoints_dir, image_shape):
+    jsons = sorted(glob.glob(keypoints_dir + ('*' if keypoints_dir[-1]=='/' else '/*')))
     print(len(jsons), "jsons found")
     pafs = np.empty((len(jsons), 1350))
     for filenum, filename in enumerate(jsons):
         with open(filename, "r") as f:
             kpts = f.read()
-        exec(f"kpts = {kpts}")
-        parts = np.zeros((6, image_dims[1], image_dims[0]))
+        json_acceptable_string = kpts.replace("'", "\"")
+        kpts = json.loads(json_acceptable_string)
+        parts = np.zeros((6, image_shape[1], image_shape[0]))
 
         for person in kpts['people']:
             pose_kpts = np.array(person['pose_keypoints_2d']).astype(int)
