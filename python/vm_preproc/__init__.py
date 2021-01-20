@@ -8,6 +8,7 @@ from . import utils
 from . import options
 from . import general
 from . import image
+from . import fourier_power
 from . import normals
 #from . import anonymize # Crappy opencv version bug
 from . import motion_energy
@@ -19,7 +20,8 @@ __all__ = ['options',
 			'utils', 
 			'general',
 			'image',
-			'anonymize', 
+			'fourier_power',
+			#'anonymize', 
 			'normals', 
 			'motion_energy',
 			'marker_detection',
