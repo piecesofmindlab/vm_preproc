@@ -11,22 +11,34 @@ import file_io
 # For animation rendering in notebook
 from IPython.display import HTML
 
+# all the Chinese characters serve as a temporary reminder that there is something I need to double 
+# check on
+# variables could be included at the final one line code:
+# 1. receptive fields' resolution: receptive_field_dim = (15, 20)
+# 2. frame size: size = (270, 480)
+# 3. should I switch all gridx, gridy to receptive_field_dim[1], and receptive_field_dim[0]
 
-
-def edge_length_fn (horizontal_size=480, vertical_size=270, total_patches=300):
-    """Calculate the exact length base on how many patches we want and the image resolution
-    parameters
+def edge_length_fn (horizontal_size = 480, vertical_size = 270, receptive_field_dim = (15, 20)):
+    """Calculate the exact length base on how many patches we want (receptive field dimensions) 
+    and the image resolution
+    Parameters
     ----------
     horizontal_size = int
         total pixels on x axis
     vertical_size = int
         total pixels on y axis
-    total_patches = int
-        total patches needed"""
+    receptive_field_dim= tuple
+        (y, x) gives total receptive fields given y rows x columns
+
+    Returns
+    -------
+    edge_length 
+    """
+    total_patches = receptive_field_dim[0] * receptive_field_dim[1]
     edge_length = np.sqrt (horizontal_size * vertical_size / total_patches)
     return edge_length
 
-def get_patch(im, center=None, edge_length=edge_length_fn()):
+def get_patch_fn(im, center=None, edge_length=edge_length_fn()):
     """Get a patch from an image
     
     Parameters
@@ -38,6 +50,11 @@ def get_patch(im, center=None, edge_length=edge_length_fn()):
     edge_length : scalar
         length of patch edge
         
+    Returns
+    -------
+    im[top:bottom, left:right]:
+        select the area of the receptive field given the center
+
     Notes
     -----
     SQUARE PATCHES ONLY FOR NOW
@@ -48,9 +65,9 @@ def get_patch(im, center=None, edge_length=edge_length_fn()):
     left = np.int(jc) - np.round(edge_length/2).astype(np.int)
     right = np.int(jc) + np.round(edge_length/2).astype(np.int)
     # the first output, indexing, is of our interest here 
-    return im[top:bottom, left:right], [top, bottom, left, right]
+    return im[top:bottom, left:right]
 
-# this is a sanity check function
+# (unimportant) this is a sanity check function that displays the receptive field patch
 def show_rect(im, loc, edge_length=edge_length_fn(), ax=None):
     rect = plt.Rectangle([loc[1]-edge_length/2, loc[0]-edge_length/2], edge_length, edge_length, 
     edgecolor='y', 
@@ -73,7 +90,18 @@ def get_grid(im, grid_x=20, grid_y=15, edge_length=edge_length_fn(), edge_buffer
     gx, gy = np.meshgrid(ix, iy)
     return gx.flatten(), gy.flatten()
 
-def compare_patches(p0, p1, method='dTotal'):
+def compare_patches_fn (p0, p1, method='dTotal'):
+    """
+    Parameters
+    ----------
+    p0, p1 = arrays
+        both are 2d arrays, generated from the get_patch_fn
+
+    Returns
+    -------
+    err
+        value that determines whether patch "p1" is the best match translational patch for patch "p0"
+    """
     if method=='euclidean':
         err = np.sum((p0.flatten()-p1.flatten())**2)
     # dTotal= the total motion of that patch
@@ -85,9 +113,12 @@ def compare_patches(p0, p1, method='dTotal'):
         raise ValueError('Unknown method!')
     return err
 
-# calculates to dx and dy which is u, v for quiverplot                                                                                                                    
-def angle_to_uv(radius, angle):
-    """calculate and return dx, dy for patches, o degree angle points at 12 o'clock, rotates clockwise"""
+# calculates dx and dy                                                                                                                     
+def angle_to_uv_fn(radius, angle):
+    """
+    calculate and return dx, dy for patches(which is u, v for quiverplot), 
+    0 degree angle points at 12 o'clock, it rotates clockwise
+    """
     # Angles should rotate clockwise from top; thus, need -angle + 90 in here:
     dx = np.cos(np.radians(-angle+90)) * radius
     dy = np.sin(np.radians(-angle+90)) * radius
@@ -105,12 +136,17 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
                                             ):
     
     """
-    the nth_percentile is the threshold that exclude the top 5% radius length and dResdual(是不是还有bottom 5% radius length?因为是为了排除极其小的vector以及比较长的vector)
-    Returns 2 arrays:
-    output_angle_radius_err:
-        a n_frames-1*300*4 array, contains radius, angle, dResidual, dMotion for each patch and each frame
+    Parameters
+    ----------
+    nth_percentile: 
+        the threshold that exclude the top 5% radius length and dResdual(是不是还有bottom 5% radius length?因为是为了排除极其小的vector以及比较长的vector)
+    
+    Returns
+    -------
+    output_radius_angle_dResidual_dMotion: 
+        a (n_frames-1)*300*4 3-dimensional array, contains radius, angle, dResidual, dMotion for each patch and each frame
     real_flowfield:
-        a n_frames-1*300*2 array, dx dy
+        a (n_frames-1)*300*2 3-dimensional array, dx dy
 
     """
     # Get first frame to set up grid, etc
@@ -119,10 +155,10 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
                       grid_x=grid_x, 
                       grid_y=grid_y, 
                       edge_buffer=edge_buffer)
-    n_radii = len(radii)
+    n_radii = len(radii) 
     n_frames = len(movie) 
     angles = np.arange(0, 360., 360./n_angles)
-    output_angle_radius_err = np.zeros((n_frames-1, grid_x * grid_y, 4)) # radius, angle, dResidual, dMotion
+    output_radius_angle_dResidual_dMotion = np.zeros((n_frames-1, grid_x * grid_y, 4)) # radius, angle, dResidual, dMotion
     # loop over n_frames-1
 #     for 
     # Loop over frames
@@ -143,9 +179,9 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
         # Loop over grid locations
         for igrid, (gy_, gx_) in enumerate(zip(gy, gx)):
             # Get patch from this frame
-            patch0, _ = get_patch(this_frame, center=(gy_, gx_), edge_length=edge_length)
+            patch0 = get_patch_fn(this_frame, center=(gy_, gx_), edge_length=edge_length)
             # Get patch from next frame
-            next_patch0, _ = get_patch(next_frame, center=(gy_, gx_), edge_length=edge_length)
+            next_patch0 = get_patch_fn(next_frame, center=(gy_, gx_), edge_length=edge_length)
             # Compute dTotal(mean luminance change of every pixel in a patch)
             dTotal_patch = np.mean(np.abs(patch0 - next_patch0))
             # Preallocate error measurements 不明白
@@ -156,10 +192,10 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
                 # Loop over secondary patches
                 for iangle, (cx_, cy_) in enumerate(zip(cx, cy)):
                     # Can cause bugs because might run off edge of image.
-                    patch1, _ = get_patch(next_frame, center=(cy_, cx_), edge_length=edge_length)
+                    patch1 = get_patch_fn(next_frame, center=(cy_, cx_), edge_length=edge_length)
                     # Make our comparison!
                     # (you want to keep this value for each angle and radius)
-                    err = compare_patches(patch0, patch1, method='dTotal')
+                    err = compare_patches_fn (patch0, patch1, method='dTotal')
                     dResidual_patch[iradius, iangle] = err
             # gives the indicis of the best radius and anglefor each patch
             best_radius, best_angle = np.nonzero(dResidual_patch==np.min(dResidual_patch))
@@ -170,46 +206,46 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
             this_angle = angles[best_angle]
             dResidual_patch = dResidual_patch[best_radius, best_angle]
             dMotion_patch = dTotal_patch - dResidual_patch
-            output_angle_radius_err[ifr, igrid, 0] = this_radius
-            output_angle_radius_err[ifr, igrid, 1] = this_angle
-            output_angle_radius_err[ifr, igrid, 2] = dResidual_patch
-            output_angle_radius_err[ifr, igrid, 3] = dMotion_patch 
+            output_radius_angle_dResidual_dMotion[ifr, igrid, 0] = this_radius
+            output_radius_angle_dResidual_dMotion[ifr, igrid, 1] = this_angle
+            output_radius_angle_dResidual_dMotion[ifr, igrid, 2] = dResidual_patch
+            output_radius_angle_dResidual_dMotion[ifr, igrid, 3] = dMotion_patch 
     
     # threshold设定需要在原先的loop以外
     for ifr, _ in enumerate(movie):
         if ifr==len(movie)-1:
             break
-        ifr_dRes, ifr_radius = output_angle_radius_err[ifr, :, 2], output_angle_radius_err[ifr, :, 0]
+        ifr_dRes, ifr_radius = output_radius_angle_dResidual_dMotion[ifr, :, 2], output_radius_angle_dResidual_dMotion[ifr, :, 0]
         index_top_nth_percentile = int(np.round(grid_x * grid_y * nth_percentile * -1))
         # Method 1 directly zeroing all selected indices after i=-15
         # exclude non-motion related changes such as newly appeared objects
         # selected_indices_1 = np.argsort(ifr_dRes)[index_top_nth_percentile :] 
         # for index in selected_indices_1:
-        #     output_angle_radius_err[ifr, index, 0] = 0
-        #     output_angle_radius_err[ifr, index, 1] = 0
+        #     output_radius_angle_dResidual_dMotion[ifr, index, 0] = 0
+        #     output_radius_angle_dResidual_dMotion[ifr, index, 1] = 0
         # rule out long vectors
         selected_indices_2 = np.argsort(ifr_radius)[index_top_nth_percentile :]
         for index in selected_indices_2:
-            output_angle_radius_err[ifr, index, 0] = 0
-            output_angle_radius_err[ifr, index, 1] = 0
+            output_radius_angle_dResidual_dMotion[ifr, index, 0] = 0
+            output_radius_angle_dResidual_dMotion[ifr, index, 1] = 0
         # Method 2 finding one value and make comparisions
     #     top5th_percentile_alldRes = np.argsort(ifr_dRes)[index_top_nth_percentile] 
     #     top5th_percentile_alldMot = np.argsort(ifr_dMot)[index_top_nth_percentile]
     # #但是在这里我们还没有全部dMot的矩阵所以需要先得到全部矩阵才能在每一帧里面挑选前5%
     #     for i_ifr_dMot_patch, ifr_dMot_patch in enumerate(ifr_dMot): 
     #         if ifr_dMot_patch >= top5th_percentile_alldMot:
-    #             output_angle_radius_err[ifr, i_ifr_dMot_patch, 0] = 0
-    #             output_angle_radius_err[ifr, i_ifr_dMot_patch, 1] = 0
+    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dMot_patch, 0] = 0
+    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dMot_patch, 1] = 0
     #     for i_ifr_dRes_patch, ifr_dRes_patch in enumerate(ifr_dRes):
     #         if ifr_dRes >= top5th_percentile_alldRes:
-    #             output_angle_radius_err[ifr, i_ifr_dRes_patch, 0] = 0
-    #             output_angle_radius_err[ifr, i_ifr_dRes_patch, 1] = 0
+    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dRes_patch, 0] = 0
+    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dRes_patch, 1] = 0
     # threshold_1 = threshold_1_factor * dTotal_patch
     # threshold_2 = threshold_2_factor * dTotal_patch          
-    dx, dy = angle_to_uv(output_angle_radius_err[:, :, 0].reshape((n_frames-1, grid_x*grid_y, 1)), 
-                         output_angle_radius_err[:, :, 1].reshape((n_frames-1, grid_x*grid_y, 1)))
+    dx, dy = angle_to_uv_fn(output_radius_angle_dResidual_dMotion[:, :, 0].reshape((n_frames-1, grid_x*grid_y, 1)), 
+                         output_radius_angle_dResidual_dMotion[:, :, 1].reshape((n_frames-1, grid_x*grid_y, 1)))
     real_flowfield = np.dstack((dx, dy))
-    return output_angle_radius_err, real_flowfield
+    return output_radius_angle_dResidual_dMotion, real_flowfield
             
 
 
