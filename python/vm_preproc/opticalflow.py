@@ -10,13 +10,17 @@ import os
 import file_io 
 # For animation rendering in notebook
 from IPython.display import HTML
+# from vm_preproc import opticalflow  (this is when the optical flow module is done and ready to be imported)
 
 # all the Chinese characters serve as a temporary reminder that there is something I need to double 
 # check on
-# variables could be included at the final one line code:
+
+# Variables could be included at the final one line code,最终在这个终极oneline code之外找不到任何magic number, 输出的是(nframe-1)*receptive fields' resolution*(至少是3)的三维矩阵,因为这个矩阵有dMotion, dGlobal, dLocal;并且能够画图得到三个不同颜色的向量在每一个gridpoint上显示出来:
 # 1. receptive fields' resolution: receptive_field_dim = (15, 20)
 # 2. frame size: size = (270, 480)
-# 3. should I switch all gridx, gridy to receptive_field_dim[1], and receptive_field_dim[0]
+# 3. switch all gridx, gridy to: receptive_field_dim[1], and receptive_field_dim[0]
+# 4. edge_buffer = 24
+# 5. compute_radius_angle_dMotion...函数里的所有parameter都应该变成 manipulative variables
 
 def edge_length_fn (horizontal_size = 480, vertical_size = 270, receptive_field_dim = (15, 20)):
     """Calculate the exact length base on how many patches we want (receptive field dimensions) 
@@ -118,6 +122,10 @@ def angle_to_uv_fn(radius, angle):
     """
     calculate and return dx, dy for patches(which is u, v for quiverplot), 
     0 degree angle points at 12 o'clock, it rotates clockwise
+    Returns
+    -------
+    dx: array
+    dy: array
     """
     # Angles should rotate clockwise from top; thus, need -angle + 90 in here:
     dx = np.cos(np.radians(-angle+90)) * radius
@@ -126,14 +134,17 @@ def angle_to_uv_fn(radius, angle):
 
 
 # 目前这里已经变成包括所有frames,后面的indexing需要改变
-def compute_radius_angle_dResidual_dMotion(movie, grid_x=20, 
-                                            grid_y=15, 
-                                            edge_length=edge_length_fn(),
-                                            radii=np.linspace(1, 24, 7), # 7 radii mentioned in the paper
-                                            n_angles=12,
-                                            edge_buffer=24, # max patch-comparision radii
-                                            use_luminance=True, nth_percentile= 0.05
-                                            ):
+# threshold改成z-score
+def compute_radius_angle_dResidual_dMotion_dTotal(movie, grid_x=20, 
+                                                  grid_y=15, 
+                                                  edge_length=edge_length_fn(),
+                                                  radii=np.linspace(1, 24, 7), # 7 radii mentioned in the paper
+                                                  n_angles=12,
+                                                  edge_buffer=24, # max patch-comparision radii
+                                                  use_luminance=True,
+                                                  use_threshold=True, z_score_threshold=3,
+                                                  nth_percentile= 0.05 # could be discarded
+                                                  ):
     
     """
     Parameters
@@ -143,10 +154,14 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
     
     Returns
     -------
-    output_radius_angle_dResidual_dMotion: 
-        a (n_frames-1)*300*4 3-dimensional array, contains radius, angle, dResidual, dMotion for each patch and each frame
-    real_flowfield:
-        a (n_frames-1)*300*2 3-dimensional array, dx dy
+    output_radius_angle_dResidual_dMotion_dTotal: a (n_frames-1)*300*5 3-dimensional array
+        contains radius, angle, dResidual, dMotion, dTotal for each patch and each frame
+    
+    real_flowfield:a (n_frames-1)*300*2 3-dimensional array
+        dx dy
+    
+    outlier_quantity: a (n_frames-1)*1 1-dimensional array
+        total numbers of patches that were considered as outlier of each frame
 
     """
     # Get first frame to set up grid, etc
@@ -158,10 +173,9 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
     n_radii = len(radii) 
     n_frames = len(movie) 
     angles = np.arange(0, 360., 360./n_angles)
-    output_radius_angle_dResidual_dMotion = np.zeros((n_frames-1, grid_x * grid_y, 4)) # radius, angle, dResidual, dMotion
+    output_radius_angle_dResidual_dMotion_dTotal = np.zeros((n_frames-1, grid_x * grid_y, 5)) # radius, angle, dResidual, dMotion
+    outlier_quantity = []
     # loop over n_frames-1
-#     for 
-    # Loop over frames
     for ifr, frame in enumerate(movie):
         if ifr==len(movie)-1:
             break
@@ -184,85 +198,101 @@ def compute_radius_angle_dResidual_dMotion(movie, grid_x=20,
             next_patch0 = get_patch_fn(next_frame, center=(gy_, gx_), edge_length=edge_length)
             # Compute dTotal(mean luminance change of every pixel in a patch)
             dTotal_patch = np.mean(np.abs(patch0 - next_patch0))
-            # Preallocate error measurements 不明白
+            # Preallocate error measurements 
             dResidual_patch = np.zeros((n_radii, n_angles))
             for iradius, radius in enumerate(radii):
-                # Get secondary patch locations
+                # Get secondary patch locations,circle_pos() default circle at BotCCW(bottom counter clockwise)but after transposition, it became right-headed clockwise
                 cx, cy = vmt.plot_utils.circle_pos(radius, n_angles, x_center=gx_, y_center=gy_).T
-                # Loop over secondary patches
-                for iangle, (cx_, cy_) in enumerate(zip(cx, cy)):
-                    # Can cause bugs because might run off edge of image.
+                # Loop over secondary patches 这里原来写的是(cx, cy)
+                for iangle, (cy_, cx_) in enumerate(zip(cy, cx)):
                     patch1 = get_patch_fn(next_frame, center=(cy_, cx_), edge_length=edge_length)
                     # Make our comparison!
-                    # (you want to keep this value for each angle and radius)
                     err = compare_patches_fn (patch0, patch1, method='dTotal')
+                    # storing this value for each angle and radius
                     dResidual_patch[iradius, iangle] = err
             # gives the indicis of the best radius and anglefor each patch
-            best_radius, best_angle = np.nonzero(dResidual_patch==np.min(dResidual_patch))
-            # Might want to check if length of best_radius > 1
-            best_radius = best_radius[0]
-            best_angle = best_angle[0]
-            this_radius = radii[best_radius]
-            this_angle = angles[best_angle]
-            dResidual_patch = dResidual_patch[best_radius, best_angle]
+            i_best_radius, i_best_angle = np.nonzero(dResidual_patch==np.min(dResidual_patch))
+            # in case the length of best_radius > 1
+            i_best_radius = i_best_radius[0]
+            i_best_angle = i_best_angle[0]
+            this_radius = radii[i_best_radius]
+            this_angle = angles[i_best_angle]
+            dResidual_patch = dResidual_patch[i_best_radius, i_best_angle]
             dMotion_patch = dTotal_patch - dResidual_patch
-            output_radius_angle_dResidual_dMotion[ifr, igrid, 0] = this_radius
-            output_radius_angle_dResidual_dMotion[ifr, igrid, 1] = this_angle
-            output_radius_angle_dResidual_dMotion[ifr, igrid, 2] = dResidual_patch
-            output_radius_angle_dResidual_dMotion[ifr, igrid, 3] = dMotion_patch 
+            output_radius_angle_dResidual_dMotion_dTotal[ifr, igrid, 0] = this_radius
+            output_radius_angle_dResidual_dMotion_dTotal[ifr, igrid, 1] = this_angle
+            output_radius_angle_dResidual_dMotion_dTotal[ifr, igrid, 2] = dResidual_patch
+            output_radius_angle_dResidual_dMotion_dTotal[ifr, igrid, 3] = dMotion_patch
+            output_radius_angle_dResidual_dMotion_dTotal[ifr, igrid, 4] = dTotal_patch 
+        
+        # threshold设定需要在原先的loop以外
+        # 1. use z units to define outliers, 2. make threshold a kwarg so it can be on and off for appropriate settings
+        if use_threshold:
+            # first threshold targets dRes
+            ifr_radius, ifr_dRes, ifr_dMot = (output_radius_angle_dResidual_dMotion_dTotal[ifr, :, 0], 
+                                              output_radius_angle_dResidual_dMotion_dTotal[ifr, :, 2], 
+                                              output_radius_angle_dResidual_dMotion_dTotal[ifr, :, 3])
+            dMot_radius = np.divide(ifr_dMot, ifr_radius)
+            ifr_dRes_mean, ifr_dRes_std = np.mean(ifr_dRes), np.std(ifr_dRes)
+            ifr_radius_mean, ifr_radius_std = np.mean(ifr_radius), np.std(ifr_radius)
+            dMot_radius_mean, dMot_radius_std = np.mean(dMot_radius), np.std(dMot_radius)
+            for i_ifr_dRes, ifr_dRes in enumerate(ifr_dRes):
+                z = (ifr_dRes - ifr_dRes_mean) / ifr_dRes_std
+                if z > z_score_threshold:
+                    #radius and angle are set to zero but not dRes and dMot
+                    output_radius_angle_dResidual_dMotion_dTotal[ifr, i_ifr_dRes, 0] = 0
+                    output_radius_angle_dResidual_dMotion_dTotal[ifr, i_ifr_dRes, 1] = 0
     
-    # threshold设定需要在原先的loop以外
-    for ifr, _ in enumerate(movie):
-        if ifr==len(movie)-1:
-            break
-        ifr_dRes, ifr_radius = output_radius_angle_dResidual_dMotion[ifr, :, 2], output_radius_angle_dResidual_dMotion[ifr, :, 0]
-        index_top_nth_percentile = int(np.round(grid_x * grid_y * nth_percentile * -1))
-        # Method 1 directly zeroing all selected indices after i=-15
-        # exclude non-motion related changes such as newly appeared objects
-        # selected_indices_1 = np.argsort(ifr_dRes)[index_top_nth_percentile :] 
-        # for index in selected_indices_1:
-        #     output_radius_angle_dResidual_dMotion[ifr, index, 0] = 0
-        #     output_radius_angle_dResidual_dMotion[ifr, index, 1] = 0
-        # rule out long vectors
-        selected_indices_2 = np.argsort(ifr_radius)[index_top_nth_percentile :]
-        for index in selected_indices_2:
-            output_radius_angle_dResidual_dMotion[ifr, index, 0] = 0
-            output_radius_angle_dResidual_dMotion[ifr, index, 1] = 0
-        # Method 2 finding one value and make comparisions
-    #     top5th_percentile_alldRes = np.argsort(ifr_dRes)[index_top_nth_percentile] 
-    #     top5th_percentile_alldMot = np.argsort(ifr_dMot)[index_top_nth_percentile]
-    # #但是在这里我们还没有全部dMot的矩阵所以需要先得到全部矩阵才能在每一帧里面挑选前5%
-    #     for i_ifr_dMot_patch, ifr_dMot_patch in enumerate(ifr_dMot): 
-    #         if ifr_dMot_patch >= top5th_percentile_alldMot:
-    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dMot_patch, 0] = 0
-    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dMot_patch, 1] = 0
-    #     for i_ifr_dRes_patch, ifr_dRes_patch in enumerate(ifr_dRes):
-    #         if ifr_dRes >= top5th_percentile_alldRes:
-    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dRes_patch, 0] = 0
-    #             output_radius_angle_dResidual_dMotion[ifr, i_ifr_dRes_patch, 1] = 0
-    # threshold_1 = threshold_1_factor * dTotal_patch
-    # threshold_2 = threshold_2_factor * dTotal_patch          
-    dx, dy = angle_to_uv_fn(output_radius_angle_dResidual_dMotion[:, :, 0].reshape((n_frames-1, grid_x*grid_y, 1)), 
-                         output_radius_angle_dResidual_dMotion[:, :, 1].reshape((n_frames-1, grid_x*grid_y, 1)))
+            # second threshold targets vector length(radius)
+            for i_ifr_radius, ifr_radius in enumerate(ifr_radius):
+                z = (ifr_radius - ifr_radius_mean) / ifr_radius_std
+                if z > z_score_threshold:
+                    #radius and angle are set to zero but not dRes and dMot
+                    output_radius_angle_dResidual_dMotion_dTotal[ifr, i_ifr_radius, 0] = 0
+                    output_radius_angle_dResidual_dMotion_dTotal[ifr, i_ifr_radius, 1] = 0
+
+            # third threshold targets radius / dMot (radius=vector length)
+            for i_dMot_radius, dMot_radius in enumerate(dMot_radius):
+                z = (dMot_radius - dMot_radius_mean) / dMot_radius_std
+                if z > z_score_threshold:
+                    #radius and angle are set to zero but not dRes and dMot
+                    output_radius_angle_dResidual_dMotion_dTotal[ifr, i_dMot_radius, 0] = 0
+                    output_radius_angle_dResidual_dMotion_dTotal[ifr, i_dMot_radius, 1] = 0    
+       
+           # fourth threshold (more of a sanity check), if any dMotion=zero, discard as outlier
+            zeros_indices_y = np.nonzero(output_radius_angle_dResidual_dMotion_dTotal[ifr, :, 3]==0)
+            for i_zeros_indices_y in zeros_indices_y:
+                    #radius and angle are set to zero but not dRes and dMot
+                output_radius_angle_dResidual_dMotion_dTotal[ifr, i_zeros_indices_y, 0] = 0
+                output_radius_angle_dResidual_dMotion_dTotal[ifr, i_zeros_indices_y, 1] = 0
+            outlier_quantity.append(np.sum(output_radius_angle_dResidual_dMotion_dTotal[ifr, :, 0]==0)) 
+
+
+    dx, dy = angle_to_uv_fn(output_radius_angle_dResidual_dMotion_dTotal[:, :, 0].reshape((n_frames-1, grid_x*grid_y, 1)), 
+                         output_radius_angle_dResidual_dMotion_dTotal[:, :, 1].reshape((n_frames-1, grid_x*grid_y, 1)))
     real_flowfield = np.dstack((dx, dy))
-    return output_radius_angle_dResidual_dMotion, real_flowfield
+    outlier_quantity = np.array(outlier_quantity)
+    return output_radius_angle_dResidual_dMotion_dTotal, real_flowfield, outlier_quantity
             
 
 
-def show_ff_quiver_plot(movie= None, g_vec_selected = None, frame_index = None, scale=1, 
+def show_ff_quiver_plot(movie= None, vec_selected = None, frame_index = None, scale=1, 
                         figsize = (8, 4.5), color=(1, 0.9, 0), title= None, ax=None, grid_x = 20,
                         grid_y = 15, frame_size=(270,480,3), savefig= True, fig_title='unnamed.jpeg' ):
     """
-    for visualization the quivoplot image overlaying on top of the movie frame when movie is given. The default does
-    output an "unnamed.jpeg" file.
-    Parameters:
-    -----------
+    for visualization the quivoplot image overlaying on top of the movie frame when movie is given. The 
+    default outputs an "unnamed.jpeg" file.
+    
+    Parameters
+    ----------
     i_gff : scalar
         index of the gff we want to plot
     """
     # should be the input
-    # g_vec_selected = all_gffs[i_gff, :, :]
-    u, v = g_vec_selected[:, 0].reshape(grid_x, grid_y), g_vec_selected[ :, 1].reshape(grid_x, grid_y)
+    # if we want to show the global_ff, then vec_selected = all_gffs[i_gff, :, :]
+    # 这里我把原来的vec_selected[:, 1]改成了vec_selected[:, :, 1], 可能在呈现global flowfield的时候要小心
+    u, v = vec_selected[frame_index, :, 0], vec_selected[frame_index, :, 1] 
+    u, v = u.reshape(grid_x, grid_y), v.reshape(grid_x, grid_y)
     # Get first frame to set up grid, etc
     if movie is not None:
         first_frame = movie[0]
@@ -283,12 +313,14 @@ def show_ff_quiver_plot(movie= None, g_vec_selected = None, frame_index = None, 
         return ax.quiver(gx, gy, u, v, color = color, scale=scale, scale_units='x')
 
 
-def sanity_check_real_flowfield(movie, nth_percentile= 0.05, figsize = (8, 4.5), scale=0.1):
-    """plot all real flow fields in quiver plots"""
-    _, real_flowfield=compute_radius_angle_dResidual_dMotion(movie, nth_percentile= nth_percentile)
+def sanity_check_real_flowfield(movie, vec_selected,
+                                nth_percentile= 0.05, figsize = (8, 4.5), 
+                                scale=0.1):
+    """plot every real flow fields for everu frame in quiver plots"""
+    _, real_flowfield=compute_radius_angle_dResidual_dMotion_dTotal(movie, nth_percentile= nth_percentile)
     n_frames = len(movie)
-    for i in range(0, n_frames-1):
+    for i in range(n_frames -1):
         #改成subplot格式,问题出在这里了,plots每次都会更新,
-        plots =show_ff_quiver_plot(movie= movie, g_vec_selected=real_flowfield[i, :, :], frame_index=i,
+        plots =show_ff_quiver_plot(movie= movie, vec_selected=vec_selected, frame_index=i,
                                     title=i, figsize= figsize, savefig= False, scale=scale)
     return plots
