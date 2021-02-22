@@ -3,7 +3,7 @@
 import numpy as np
 from skimage import color as skcol
 
-def convert_color(S, conversion='rgb2lab', keep_colors=False, **kwargs):
+def convert_color(S, conversion='rgb2lab', keep_colors=False, progress_bar=None, **kwargs):
     """Wholescale color conversion of (x, y, c, t) arrays
     
     Generally intended to convert RGB images to luminance images. 
@@ -14,7 +14,10 @@ def convert_color(S, conversion='rgb2lab', keep_colors=False, **kwargs):
     ----------
     S : array
     	image stack, (frames, y, x, color)
-
+    progress_bar : tqdm instance
+        not yet functional; code needs rewrite to implement
+        a useful progress bar
+        
     Notes
     -----
     Could probably use some more intelligent memory management
