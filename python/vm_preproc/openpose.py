@@ -40,7 +40,7 @@ right_feet_fill_idxs = (14,20,19,21,)
 # Code to generate keypoint jsons should be something like this:
 # ./build/examples/openpose/openpose.bin --video /hdd01/hdd_space/stimuli/VEDB/2020_08_23_22_27_12.mp4 --write_json /hdd01/matthew_sync/space/matt/BioMotion/features/VEDB/openpose/keypoints/ --face --hand --part_candidates --net_resolution 240x240 && ./build/examples/openpose/openpose.bin --video /hdd01/hdd_space/stimuli/VEDB/2020_09_14_13_54_11.mp4 --write_json /hdd01/matthew_sync/space/matt/BioMotion/features/VEDB/openpose/keypoints/ --face --hand --part_candidates --net_resolution 240x240
 
-def kpts_to_parts(keypoints_dir, image_shape):
+def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=True, use_body_face_kpts=False, use_body_hand_kpts=False, downsampling='max_pooling'):
     jsons = sorted(glob.glob(keypoints_dir + ('*' if keypoints_dir[-1]=='/' else '/*')))
     print(len(jsons), "jsons found")
     pafs = np.empty((len(jsons), 1350))
@@ -53,12 +53,16 @@ def kpts_to_parts(keypoints_dir, image_shape):
 
         for person in kpts['people']:
             pose_kpts = np.array(person['pose_keypoints_2d']).astype(int)
-
             # Faces
-            faces_fill_pts = [(pose_kpts[pt*3], pose_kpts[pt*3+1]) for pt in faces_fill_idxs]
-            faces_fill_pts = np.array([pts for pts in faces_fill_pts if 0 not in pts])
-            if len(faces_fill_pts) != 0:
-                cv2.fillConvexPoly(img=parts[0], points=np.array(faces_fill_pts).astype('int32'), color=(1,1,1));
+            if use_face_kpts:
+                if len(person['face_keypoints_2d']) != 0:
+                    face_kpts = np.array(person['face_keypoints_2d']).astype(int)
+                    cv2.fillConvexPoly(img=parts[0], points=np.array([(face_kpts[i*3], face_kpts[i*3+1]) for i in list(range(17)) + list(range(26,16,-1))]).astype('int32'), color=(1,1,1));
+            if use_body_face_kpts:
+                faces_fill_pts = [(pose_kpts[pt*3], pose_kpts[pt*3+1]) for pt in faces_fill_idxs]
+                faces_fill_pts = np.array([pts for pts in faces_fill_pts if 0 not in pts])
+                if len(faces_fill_pts) != 0:
+                    cv2.fillConvexPoly(img=parts[0], points=np.array(faces_fill_pts).astype('int32'), color=(1,1,1));
 
             # Trunks
             for pair in trunks_lines_idxs:
@@ -82,10 +86,18 @@ def kpts_to_parts(keypoints_dir, image_shape):
                     cv2.line(img=parts[2], pt1=pt1, pt2=pt2, color=(1, 1, 1), thickness=thickness, )
 
             # Hands
-            for hand in hands_point_idxs:
-                pt=(pose_kpts[hand*3],pose_kpts[hand*3+1])
-                if 0 not in pt:
-                    cv2.circle(parts[3], pt, 10, color=(1, 1, 1), thickness=thickness)
+            if use_hand_kpts:
+                left_hand_kpts = kpts['people'][0]['hand_left_keypoints_2d']
+                right_hand_kpts = kpts['people'][0]['hand_right_keypoints_2d']
+                if len(left_hand_kpts) != 0:
+                    cv2.fillConvexPoly(img=parts[3], points=np.array([(int(right_hand_kpts[i*3]), int(right_hand_kpts[i*3+1])) for i in range(21)]).astype('int32'), color=(1,1,1))
+                if len(right_hand_kpts) != 0:
+                    cv2.fillConvexPoly(img=parts[3], points=np.array([(int(left_hand_kpts[i*3]), int(left_hand_kpts[i*3+1])) for i in range(21)]).astype('int32'), color=(1,1,1))
+            if use_body_hand_kpts:
+                for hand in hands_point_idxs:
+                    pt=(pose_kpts[hand*3],pose_kpts[hand*3+1])
+                    if 0 not in pt:
+                        cv2.circle(parts[3], pt, 10, color=(1, 1, 1), thickness=thickness)
 
             # Legs
             for pair in legs_lines_idxs:
@@ -105,5 +117,15 @@ def kpts_to_parts(keypoints_dir, image_shape):
             right_feet_fill_pts = np.array([pts for pts in right_feet_fill_pts if 0 not in pts])
             if len(right_feet_fill_pts) != 0:
                 cv2.fillConvexPoly(img=parts[5], points=np.array(right_feet_fill_pts).astype('int32'), color=(1,1,1));
-        pafs[filenum] = np.array([cv2.resize(part, (15,15), interpolation=cv2.INTER_AREA).flatten() for part in parts]).flatten()
+        
+        # Downsampling
+        if downsampling == 'max_pooling':
+            downsampled = np.empty((6,15,15))
+            splits = [np.array_split(split, 15, axis=2) for split in np.array_split(parts, 15, axis=1)]
+            for i in range(15):
+                for j in range(15):
+                    downsampled[:,i,j] = splits[i][j].max(1).max(1)
+            pafs[filenum] = downsampled.flatten()
+        else:
+            pafs[filenum] = np.array([cv2.resize(part, (15,15), interpolation=cv2.INTER_AREA).flatten() for part in parts]).flatten()
     return pafs
