@@ -420,7 +420,7 @@ def show_motion_energy_color(features, params, ax=None, is_overlay=False,
                 to_plot = gnorm[sfi & tfi].copy()
             cols[:, itf] = to_plot
         # Alpha channel
-        cols[:, 3] = np.abs(cols[:, :2] - 0.5).max(axis=1) * 2
+        cols[:, 3] = np.abs(cols[:, :3] - 0.5).max(axis=1) * 2
         tfi = tfis[np.argmin(ns)]
         jj = sfi & tfi
         if sf == 0:
