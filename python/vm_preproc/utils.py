@@ -411,6 +411,10 @@ def batch_run(fn, inpt,
     # Consider replacing with `with` call?
     try:
         kws = get_default_kwargs(inpt.load)
+        kws_fn = get_default_kwargs(fn)
+        # Remove progress bar kwarg if not supported
+        if (not 'progress_bar' in kws_fn) and ('progress_bar' in kwargs):
+            _ = kwargs.pop('progress_bar')
         print('Running %d batches'%n_batches)
         for ibatch in range(n_batches):
             print(f"Running batch {ibatch} / {n_batches}")
