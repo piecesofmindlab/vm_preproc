@@ -830,7 +830,7 @@ def show_all_ff_quiver_plot(movie=None, dict_selected=None, frame_index=None, sc
         gx, gy, lff_u, lff_v, color=lff_arrow_color, scale=scale, scale_units='x', headwidth=headwidth, headlength=headlength, headaxislength=headaxislength, width=arrow_width)
     plt.close()
     if savefig:
-        return plt.savefig(fig_title,  bbox_inches='tight', pad_inches=0)
+        return fig.savefig(fig_title,  bbox_inches='tight', pad_inches=0)
     else:
         return fig
 
@@ -1133,7 +1133,7 @@ def ground_truth_generator(movie=None, frames=(0,3), fps=2, figsize=(16,9), titl
     # clear all frames previously added
     converter.clear()
     frame_start, frame_end = frames
-    for i in range(frame_start, frame_end-1):
+    for i in range(frame_start, frame_end):
         fig = fig_fn(movie=movie, n_frames=i, title=title, dpi=dpi, subplot_spaceing=subplot_spaceing)
         converter.add(fig)
     # miliseconds
