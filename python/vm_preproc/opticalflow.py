@@ -3,6 +3,7 @@ import vm_preproc as vmp
 import vedb_store
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import skimage.transform as skt
 import skimage.color as skcol
 import glob
@@ -598,13 +599,16 @@ def dMot_dMotG_dMotL_fn(movie, receptive_field_dim=(15, 20), radius_range=(1, 24
 
             'n_frames' : n_frames scalar value
                 total number of frames in the movie
+
+            'all_gff_score': (n_frames-1)*124 array
+                the metrics that evaluates how good a gff is matching to the global flowfield
     """
     n_total_gffs = n_trans_gffs + n_centr_gffs + n_rotat_gffs
     grid_x, grid_y = receptive_field_dim[1], receptive_field_dim[0]
     total_patches = grid_x * grid_y
     n_frames = len(movie)
     # preset output arrays, later will be filled by .append()
-    all_dMot, all_dMotG, all_dMotL, all_gff, all_lff, all_rff, all_ibest_gff, all_dMotGlobal_score, all_Pgr, all_zero_in_rff, all_zero_in_lff, all_zero_in_gff = [
+    all_dMot, all_dMotG, all_dMotL, all_gff, all_lff, all_rff, all_ibest_gff, all_gff_score, all_Pgr, all_zero_in_rff, all_zero_in_lff, all_zero_in_gff = [
     ], [], [], [], [], [], [], [], [], [], [], []
     # get rad_ang_dRes_dMot_dTot, output of "compute_rad_ang_dRes_dMot_dTot" is a dictionary
     output_dic_compute_rad_ang_dRes_dMot_dTot = compute_rad_ang_dRes_dMot_dTot(
@@ -628,11 +632,11 @@ def dMot_dMotG_dMotL_fn(movie, receptive_field_dim=(15, 20), radius_range=(1, 24
         # this line of code would ignore all error reports regarding denominator being zero
         with np.errstate(divide='ignore', invalid='ignore'):
             # Pgr is the projection of global flowfield vector onto real vector
-            # all_gff_uv  300x2 array rff_vec_norm 300x2; rff_vec_norm_length 300x1; Pgr 300x124, this would put all nan to zero
+            # all_gff_uv  300x2 array rff_vec_norm 300x2; rff_vec_norm_length 300x1; Pgr 124x300, this would put all nan to zero
             Pgr = np.concatenate(np.nan_to_num([np.sum(all_gff_uv[i, :, :]*rff_vec_norm, axis=1) /
-                                  rff_vec_norm_length for i in range(0, n_total_gffs)])).reshape(300, n_total_gffs)
-        # Pgr[:,i] 300x1; dMot1x300x1 , returns dMotGlobal_score 124x1
-        dMotGlobal_score = np.array([np.sum(Pgr[:, i]*dMot)
+                                  rff_vec_norm_length for i in range(0, n_total_gffs)])).reshape(n_total_gffs, total_patches)
+        # Pgr[i, :] 1x300; dMot1x300x1 , returns dMotGlobal_score 124x1
+        dMotGlobal_score = np.array([np.sum(Pgr[i, :]*dMot)
                                      for i in range(0, n_total_gffs)])
         # ibest_gff = index of the best gff in dMotGlobal_score
         ibest_gff = [i for i, j in enumerate(
@@ -659,7 +663,7 @@ def dMot_dMotG_dMotL_fn(movie, receptive_field_dim=(15, 20), radius_range=(1, 24
         l_ff = np.subtract(rff_vec_norm, g_ff_best)
         with np.errstate(divide='ignore', invalid='ignore'):
             # global motion at every patch in pixel luminance value 300x1, eliminate all nan
-            dMotG = np.nan_to_num(np.multiply(dMot, (Pgr[:, ibest_gff]/rff_vec_norm_length)))
+            dMotG = np.nan_to_num(np.multiply(dMot, (Pgr[ibest_gff, :]/rff_vec_norm_length)))
         # local motion at every patch 300x1
         dMotL = np.subtract(dMot, dMotG)
         
@@ -678,7 +682,7 @@ def dMot_dMotG_dMotL_fn(movie, receptive_field_dim=(15, 20), radius_range=(1, 24
         all_gff.append(g_ff_best)
         all_lff.append(l_ff)
         all_rff.append(rff_vec_norm)
-        all_dMotGlobal_score.append(dMotGlobal_score)
+        all_gff_score.append(dMotGlobal_score)
         all_ibest_gff.append(ibest_gff)
         all_Pgr.append(Pgr)
         all_zero_in_rff.append(zero_in_rff) 
@@ -697,10 +701,10 @@ def dMot_dMotG_dMotL_fn(movie, receptive_field_dim=(15, 20), radius_range=(1, 24
     out_dict['all_rff'] = np.array(all_rff)
     # all_ibest_gff has the shape of (n_frame-1)x1
     out_dict['all_ibest_gff'] = np.array(all_ibest_gff)
-    # all_dMotGlobal_score has the shape of (n_frame-1)x124 since dMotGlobal_score evaluates how good the gff is in capturing the
+    # all_gff_score has the shape of (n_frame-1)x124 since dMotGlobal_score evaluates how good the gff is in capturing the
     # global motion of the video
-    out_dict['all_dMotGlobal_score'] = np.array(all_dMotGlobal_score)   
-    # all_Pgr has the shape of (n_frame-1)x300x124
+    out_dict['all_gff_score'] = np.array(all_gff_score)   
+    # all_Pgr has the shape of (n_frame-1)x124x300
     out_dict['all_Pgr'] = np.array(all_Pgr)
     out_dict['n_frames'] = n_frames
     # below 3 are sanity checks to see if they have the same number of zero vectors in all ffs
@@ -1139,3 +1143,52 @@ def ground_truth_generator(movie=None, frames=(0,3), fps=2, figsize=(16,9), titl
     # miliseconds
     interval = compute_interval(fps=fps)
     return converter.render(figsize=figsize, interval=interval)
+
+
+# Sanity check on the best matched gff by plotting the output from "all_gff_score" array and see if these scatter plots are sensible
+# This function was written by Dr. Lescroart.
+def plot_gff_match(i_frame_gff_score=None, cmap=vmt.viz.BCWOR):
+    """
+    Parameters
+    ----------
+    i_frame_gff_score : array 124x1
+        should be obtanined fron indexing frames in 'all_gff_score' array outputed by the dMot_dMotG_dMotL_fn(), and shape of 124x1
+    
+    cmap : str or `~matplotlib.colors.Colormap`, optional
+        this is an argument used in the "ax.scatter()" function, default: :rc:`image.cmap` A `.Colormap` instance or registered colormap name. 
+        *cmap* is only used if *c* is an array of floats.
+    
+    Returns
+    -------
+    fig
+        the scatter plots
+    
+    """
+    # Normalize i_frame_gff_score to be 0-1
+    mx = np.abs(i_frame_gff_score).max()
+    nrm = colors.Normalize(vmin=-mx, vmax=mx)
+    i_frame_gff_score = nrm(i_frame_gff_score)
+    sc = 3
+    fig, ax = plt.subplots(figsize=(3 * sc, 2 * sc))
+    cxy = vmt.plot_utils.circle_pos(0.4, 24, x_center=.5, y_center=1, direction='TopCW')
+    t = np.linspace(-0.3, 0.3, 5)
+    xg, yg = np.meshgrid(t, t)
+    yg = -yg
+    xyg = np.array([xg.flatten(), yg.flatten()]).T
+    centers = [[1.5, 1.5], [2.5, 1.5], [1.5, 0.5], [2.5, 0.5]]
+    xyg = np.vstack([xyg + np.array(center)[np.newaxis, :] for center in centers])
+    xy = np.vstack([cxy, xyg])
+    ax.scatter(*xy.T, c=i_frame_gff_score, cmap=cmap)
+    # Sanity check to make sure this all goes in order
+    #for j, co in enumerate(xy):
+    #ax.text(*co, j) it addes text to the axes(subplots)
+    ax.text(0.5, 1.5, 'Translation', ha='center')
+    ax.text(1.5, 1.9, 'Expansion', ha='center')
+    ax.text(2.5, 1.9, 'Contraction', ha='center')
+    ax.text(1.5, 0.9, 'Clockwise', ha='center')
+    ax.text(2.5, 0.9, 'Counter Clockwise', ha='center')
+    #ax.text()
+    ax.axis([0, 3, 0, 2])
+    ax.axis('off')
+    plt.close()
+    return fig
