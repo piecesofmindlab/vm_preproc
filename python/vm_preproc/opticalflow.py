@@ -12,7 +12,7 @@ import cv2
 import file_io
 # For animation rendering in notebook
 from IPython.display import HTML
-from vm_preproc import opticalflow  
+# from vm_preproc import opticalflow  
 
 
 def patch_length_fn(im, receptive_field_dim=(15, 20), radius_range=(1, 24)):
@@ -533,7 +533,7 @@ def all_gff_uv_fn(receptive_field_dim=(15, 20), angle_range=(0, 360), n_trans_gf
     return all_gff_uv
 
 
-def dMot_dMotG_dMotL_fn(movie, receptive_field_dim=(15, 20), radius_range=(1, 24), n_radii=7, n_angles=12, use_luminance=True,
+def dMot_dMotG_dMotL_fn(movie=None, receptive_field_dim=(15, 20), radius_range=(1, 24), n_radii=7, n_angles=12, use_luminance=True,
                         outlier_rejection=False, z_score_threshold=3, angle_range=(0, 360), n_trans_gffs=24, n_centr_gffs=50, n_rotat_gffs=50,
                         n_equally_spacedpoints_x=5, n_equally_spacedpoints_y=5, normalized_mean_vec_length=1):
     """
@@ -721,8 +721,8 @@ def dMot_dMotG_dMotL_fn(movie, receptive_field_dim=(15, 20), radius_range=(1, 24
 def show_all_ff_quiver_plot(movie=None, dict_selected=None, frame_index=None, scale=0.1, headwidth=3, headlength=5,
                             headaxislength=4.5, arrow_width=None, figsize=(8, 4.5), rff_arrow_color="orange",
                             gff_arrow_color="purple", lff_arrow_color="green", grid_color='blue', receptive_field_dim=(15, 20),
-                            radius_range=(1, 24), frame_size=(270, 480, 3), savefig=False, fig_title='frame_xxx_all_ff.jpeg',
-                            subplot_spaceing=0.5, sharex=True, sharey=True, dpi=300):
+                            radius_range=(1, 24), savefig=False, fig_title='frame_xxx_all_ff.jpeg',
+                            subplot_spacing=0.5, sharex=True, sharey=True, dpi=300):
     """
     For visualizing 4 quivoplot images in one plot includes real flowfield, global flowfield and local flowfield overlaying on top of the movie 
     frame when movie is given. The default outputs an "unnamed.jpeg" file. It outputs one image with 4 subplots.
@@ -789,7 +789,7 @@ def show_all_ff_quiver_plot(movie=None, dict_selected=None, frame_index=None, sc
 
     # set the output fig with 4 subplots
     fig, ax = plt.subplots(2, 2, figsize=figsize, sharex=sharex, sharey=sharey, dpi=dpi)
-    fig.tight_layout(pad=subplot_spaceing)
+    fig.tight_layout(pad=subplot_spacing)
     ax[0, 0].invert_yaxis()
     ax[0, 1].invert_yaxis()
     ax[1, 0].invert_yaxis()
@@ -1017,16 +1017,25 @@ class FigureHTMLConverter:
         """Clear all frames previously added
         """
         self.frames = []
-    def render(self, **kwargs):
+    def render(self, savemovie=True, filename=None, dpi=250, **kwargs):
         """Turn added frames into HTML video within jupyter notebook.
+        
         Parameters
         ----------
+        savemovie : bool, optional
+            if true, save movie in filename's location
+        filename : unicode
+            the output filename writte in file path
         **kwargs
             Keyword arguments for vmt.plot_utils.make_image_animation
         """
         frames_array = np.moveaxis(np.array(self.frames),0,-1)
         anim = vmt.plot_utils.make_image_animation(frames_array, **kwargs)
-        display(HTML(anim.to_html5_video()))
+        if savemovie:
+            anim.save(filename, dpi=dpi)
+
+        else:
+            display(HTML(anim.to_html5_video()))
 
 
 
@@ -1054,8 +1063,8 @@ def compute_interval(fps=None):
 def video_ff_output(movie=None, input_dict=None, fps=None, scale=0.1, headwidth=3, headlength=5,
                     headaxislength=4.5, arrow_width=None, figsize=(8, 4.5), rff_arrow_color="orange",
                     gff_arrow_color="purple", lff_arrow_color="green", grid_color='blue', receptive_field_dim=(15, 20),
-                    radius_range=(1, 24), frame_size=(270, 480, 3), savefig=False, fig_title='frame_xxx_all_ff.jpeg',
-                    subplot_spaceing=0.5, sharex=True, sharey=True, dpi=300):
+                    radius_range=(1, 24), savefig=False, filename='frame_xxx_all_ff.jpeg',
+                    subplot_spacing=0.5, sharex=True, sharey=True, dpi=300, savemovie=True):
     """
     using the dictionary outputed by dMot_dMotG_dMotL_fn to generate animated ff videos
     
@@ -1065,7 +1074,8 @@ def video_ff_output(movie=None, input_dict=None, fps=None, scale=0.1, headwidth=
         the dictionary outputed by dMot_dMotG_dMotL_fn  
     fps : None, optional
         frames rate per second
-    
+    filename : unicode
+            the output filename writte in file path
     Returns
     -------
     TYPE
@@ -1079,14 +1089,14 @@ def video_ff_output(movie=None, input_dict=None, fps=None, scale=0.1, headwidth=
         fig = show_all_ff_quiver_plot(movie=movie, dict_selected=input_dict, frame_index=i, scale=scale, headwidth=headwidth, 
             headlength=headlength, headaxislength=headaxislength, arrow_width=arrow_width, figsize=figsize, 
             rff_arrow_color=rff_arrow_color, gff_arrow_color=gff_arrow_color, lff_arrow_color=lff_arrow_color, grid_color=grid_color, 
-            receptive_field_dim=receptive_field_dim, radius_range=radius_range, frame_size=frame_size, savefig=savefig, fig_title=fig_title,
-            subplot_spaceing=subplot_spaceing, sharex=sharex, sharey=sharey, dpi=dpi)
+            receptive_field_dim=receptive_field_dim, radius_range=radius_range, savefig=savefig,
+            subplot_spacing=subplot_spacing, sharex=sharex, sharey=sharey, dpi=dpi)
         converter.add(fig)
     # miliseconds
     interval = compute_interval(fps=fps)
-    return converter.render(figsize=figsize, interval=interval)
+    return converter.render(figsize=figsize, filename=filename, dpi=dpi, interval=interval, savemovie=savemovie)
 
-def fig_fn(movie=None, n_frames=None, title=None, dpi=200, subplot_spaceing=1):
+def fig_fn(movie=None, n_frames=None, title=None, dpi=200, subplot_spacing=1):
     """so the output will be able to define variable fig in ground_truth_generator function
     
     Parameters
@@ -1108,11 +1118,11 @@ def fig_fn(movie=None, n_frames=None, title=None, dpi=200, subplot_spaceing=1):
     fig, axs = plt.subplots(dpi=dpi)
     axs.imshow(movie[n_frames])
     axs.set_title(title)
-    fig.tight_layout(pad=subplot_spaceing)
+    fig.tight_layout(pad=subplot_spacing)
     plt.close()
     return fig
 
-def ground_truth_generator(movie=None, frames=(0,3), fps=2, figsize=(16,9), title=None, dpi=350, subplot_spaceing=1):
+def ground_truth_generator(movie=None, frames=(0,3), fps=2, figsize=(16,9), title=None, dpi=350, subplot_spacing=1):
     """visualize short clips of videos to know the ground truth at a certain frame
     
     Parameters
@@ -1138,7 +1148,7 @@ def ground_truth_generator(movie=None, frames=(0,3), fps=2, figsize=(16,9), titl
     converter.clear()
     frame_start, frame_end = frames
     for i in range(frame_start, frame_end):
-        fig = fig_fn(movie=movie, n_frames=i, title=title, dpi=dpi, subplot_spaceing=subplot_spaceing)
+        fig = fig_fn(movie=movie, n_frames=i, title=title, dpi=dpi, subplot_spacing=subplot_spacing)
         converter.add(fig)
     # miliseconds
     interval = compute_interval(fps=fps)
@@ -1192,3 +1202,93 @@ def plot_gff_match(i_frame_gff_score=None, cmap=vmt.viz.BCWOR):
     ax.axis('off')
     plt.close()
     return fig
+
+
+def loop_video_list_fn(video_list_dict=None, uniform_frame=True, uniform_frame_range=(9800, 9902), save_output_dict=True, 
+    save_directory_path='/home/josephz/Projects/', savemovie=True,
+
+    receptive_field_dim=(15, 20), radius_range=(1, 24), n_radii=7, n_angles=12, use_luminance=True,
+    outlier_rejection=False, z_score_threshold=3, angle_range=(0, 360), n_trans_gffs=24, n_centr_gffs=50, n_rotat_gffs=50,
+    n_equally_spacedpoints_x=5, n_equally_spacedpoints_y=5, normalized_mean_vec_length=1,
+
+    fps=2, scale=0.1, headwidth=3, headlength=5,
+    headaxislength=4.5, arrow_width=None, figsize=(12, 12), rff_arrow_color="orange",
+    gff_arrow_color="purple", lff_arrow_color="green", grid_color='blue', 
+    savefig=False, subplot_spacing=1, sharex=True, sharey=True, dpi=250):
+    """
+    The one-liner function when using the optical flow algorithm. Keep save_output_dict to be true and savemovie true if you want to save
+    both output dictionary from the dMot_dMotG_dMotL_fn() and movie with all flowfield on top of the image. 
+    
+    Parameters
+    ----------
+    video_list_dict : dictionary, optional
+        dictionary contains 1)video filepath, 2)desired video resolution after resizing, 3)an optional frame range if uniform frame is 
+        False
+    uniform_frame : bool, optional
+        Determines whether all videos will use the same range of frames, if true than the 'uniform_frame_range' argument will be used,
+        otherwise it will use the third element in each video_list_dict's key-value pair
+    uniform_frame_range : tuple, optional
+        only used when uniform_frame is True to determine the frame
+    save_output_dict : bool, optional
+        Determines whether to save the output of dMot_dMotG_dMotL_fn() to local drive as a dictionary.
+    save_directory_path : str, optional
+        Determines which directory will the output dictionary and output video be stored. must includ the '/' at the end
+    use_luminance: bool, optional
+        Always need to be true as the rad_angle_dMot_dTotal don't really support calculations when have RGB 3 channels
+    
+    """
+    # fpath_video in the for loop is the keys in dictionay, which has a data type of string
+    for fpath_video in video_list_dict:
+        # generate
+        fpath, desired_size = video_list_dict[fpath_video][0], video_list_dict[fpath_video][1]
+        # load video into array data and resize its resolution
+        if uniform_frame:
+            video_resized_data = file_io.load_mp4(fpath, frames=uniform_frame_range, size=desired_size)
+        else:
+            video_resized_data = file_io.load_mp4(fpath, frames=video_list_dict[fpath_video][2], size=desired_size)
+        
+        #这里需要替换成argument
+        out_dict_True = dMot_dMotG_dMotL_fn(movie=video_resized_data, outlier_rejection=True, z_score_threshold=z_score_threshold,
+            receptive_field_dim=receptive_field_dim, radius_range=radius_range, n_radii=n_radii, n_angles=n_angles, 
+            use_luminance=use_luminance, angle_range=angle_range, n_trans_gffs=n_trans_gffs, n_centr_gffs=n_centr_gffs, 
+            n_rotat_gffs=n_rotat_gffs, n_equally_spacedpoints_x=n_equally_spacedpoints_x, n_equally_spacedpoints_y=n_equally_spacedpoints_y, 
+            normalized_mean_vec_length=normalized_mean_vec_length)
+        out_dict_False = dMot_dMotG_dMotL_fn(movie=video_resized_data, outlier_rejection=False, z_score_threshold=z_score_threshold,
+            receptive_field_dim=receptive_field_dim, radius_range=radius_range, n_radii=n_radii, n_angles=n_angles, 
+            use_luminance=use_luminance, angle_range=angle_range, n_trans_gffs=n_trans_gffs, n_centr_gffs=n_centr_gffs, 
+            n_rotat_gffs=n_rotat_gffs, n_equally_spacedpoints_x=n_equally_spacedpoints_x, n_equally_spacedpoints_y=n_equally_spacedpoints_y, 
+            normalized_mean_vec_length=normalized_mean_vec_length)
+        # this will save output dictionary in the 'save_directory_path' directory
+        if save_output_dict:
+            # will be used in concatenating strings to form the filename path when saving output_dict
+            filetype = '.npz'
+            filename_OTR_T = save_directory_path + fpath_video + 'OTR_T' + filetype
+            np.savez(filename_OTR_T, **out_dict_True)
+            filename_OTR_F = save_directory_path + fpath_video + 'OTR_F' + filetype
+            np.savez(filename_OTR_F, **out_dict_False)
+        else:
+            pass
+        
+
+        # generate video outputs for both OTR_T (outlier rejection is true) and OTR_F conditions
+        
+        # will be used in concatenating strings to form the filename path when saving output_dict
+        video_type = '.mp4'
+        # 这里需要替换成argument
+        video_ff_output(
+            movie=video_resized_data, input_dict=out_dict_True, filename=save_directory_path + fpath_video + 'OTR_T' + video_type,
+            savemovie=savemovie, fps=fps, scale=scale, headwidth=headwidth, 
+            headlength=headlength, headaxislength=headaxislength, arrow_width=arrow_width, figsize=figsize, 
+            rff_arrow_color=rff_arrow_color, gff_arrow_color=gff_arrow_color, lff_arrow_color=lff_arrow_color, grid_color=grid_color, 
+            receptive_field_dim=receptive_field_dim, radius_range=radius_range, savefig=savefig,
+            subplot_spacing=subplot_spacing, sharex=sharex, sharey=sharey, dpi=dpi)
+
+        video_ff_output(
+            movie=video_resized_data, input_dict=out_dict_False, filename=save_directory_path + fpath_video + 'OTR_F' + video_type, 
+            savemovie=savemovie, fps=fps, scale=scale, headwidth=headwidth, 
+            headlength=headlength, headaxislength=headaxislength, arrow_width=arrow_width, figsize=figsize, 
+            rff_arrow_color=rff_arrow_color, gff_arrow_color=gff_arrow_color, lff_arrow_color=lff_arrow_color, grid_color=grid_color, 
+            receptive_field_dim=receptive_field_dim, radius_range=radius_range, savefig=savefig,
+            subplot_spacing=subplot_spacing, sharex=sharex, sharey=sharey, dpi=dpi)
+
+    print('To view newly processed and saved video files and output dictionaries, please go to', save_directory_path)
