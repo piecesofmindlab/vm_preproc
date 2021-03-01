@@ -41,6 +41,26 @@ right_feet_fill_idxs = (14, 20, 19, 21,)
 # Code to generate keypoint jsons should be something like this:
 # ./build/examples/openpose/openpose.bin --video /stimulus/directory/2020_08_23_22_27_12.mp4 --write_json /keypoints/save/location/ --face --hand --part_candidates --net_resolution 240x240
 
+def check_convex_points(kpts):
+    """Checks whether face or hand keypoints can be successfully passed
+    through scipy.spatial.ConvexHull.
+    
+    Parameters
+    ----------
+    kpts : np.ndarray
+        n_kpts X 2 array of keypoint locations
+    
+    Returns
+    -------
+    bool
+        Whether or not keypoints can be used in scipy.spatial.ConvexHull
+    """
+    valid = True
+    valid *= len(np.unique(kpts, axis=0)) >= 3
+    valid *= [len(np.unique(kpts)) > 1 for kpts in kpts.T] == [True, True]
+    valid *= len(np.unique(np.diff(kpts, axis=1))) > 1
+    return valid
+
 
 def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=True, use_body_face_kpts=False, use_body_hand_kpts=False, downsampling='max_pooling'):
     """Converts a directory of saved openpose keypoints into a 3d array of downsampled body features.
@@ -91,7 +111,7 @@ def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=
                     if len(face_kpts) != 0 and not np.all(np.array(face_kpts) == 0):
                         face_kpts = np.array(
                             face_kpts).reshape(-1, 3)[:, :2].astype(int)
-                        if len(np.unique(face_kpts, axis=0)) > 2 and [len(np.unique(kpts)) > 1 for kpts in face_kpts.T] == [True, True]:
+                        if check_convex_points(face_kpts):
                             hull = scipy.spatial.ConvexHull(face_kpts)
                             cv2.fillConvexPoly(
                                 img=parts[0], points=face_kpts[hull.vertices.T], color=(1, 1, 1))
@@ -133,20 +153,20 @@ def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=
                              color=(1, 1, 1), thickness=thickness, )
 
             # Hands
-            if use_face_kpts:
+            if use_hand_kpts:
                 left_hand_kpts = person['hand_left_keypoints_2d']
                 right_hand_kpts = person['hand_right_keypoints_2d']
                 if len(left_hand_kpts) != 0 and not np.all(np.array(left_hand_kpts) == 0):
                     left_hand_kpts = np.array(
                         left_hand_kpts).reshape(-1, 3)[:, :2].astype(int)
-                    if len(np.unique(left_hand_kpts, axis=0)) > 2 and [len(np.unique(kpts)) > 1 for kpts in left_hand_kpts.T] == [True, True]:
+                    if check_convex_points(left_hand_kpts):
                         hull = scipy.spatial.ConvexHull(left_hand_kpts)
                         cv2.fillConvexPoly(
                             img=parts[3], points=left_hand_kpts[hull.vertices.T], color=(1, 1, 1))
                 if len(right_hand_kpts) != 0 and not np.all(np.array(right_hand_kpts) == 0):
                     right_hand_kpts = np.array(
                         right_hand_kpts).reshape(-1, 3)[:, :2].astype(int)
-                    if len(np.unique(right_hand_kpts, axis=0)) > 2 and [len(np.unique(kpts)) > 1 for kpts in right_hand_kpts.T] == [True, True]:
+                    if check_convex_points(right_hand_kpts):
                         hull = scipy.spatial.ConvexHull(right_hand_kpts)
                         cv2.fillConvexPoly(
                             img=parts[3], points=right_hand_kpts[hull.vertices.T], color=(1, 1, 1))
