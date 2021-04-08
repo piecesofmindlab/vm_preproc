@@ -41,36 +41,61 @@ right_feet_fill_idxs = (14, 20, 19, 21,)
 # Code to generate keypoint jsons should be something like this:
 # ./build/examples/openpose/openpose.bin --video /stimulus/directory/2020_08_23_22_27_12.mp4 --write_json /keypoints/save/location/ --face --hand --part_candidates --net_resolution 240x240
 
+
+def check_same_line(points):
+    """Checks whether all rows describe points on the same line
+
+    Parameters
+    ----------
+    points : np.ndarray
+        n_points x 2 array of points
+
+    Returns
+    -------
+    bool
+        Whether or not all points lie on the same line
+    """
+    x0, y0 = points[0]
+    points = [(x, y) for x, y in points if x !=
+              x0 or y != y0]      # Other points
+    slopes = [(y-y0)/(x-x0) if x != x0 else None for x,
+              y in points]  # None for vertical Line
+    return all(s == slopes[0] for s in slopes)
+
+
 def check_convex_points(kpts):
     """Checks whether face or hand keypoints can be successfully passed
     through scipy.spatial.ConvexHull.
-    
+
     Parameters
     ----------
     kpts : np.ndarray
         n_kpts X 2 array of keypoint locations
-    
+
     Returns
     -------
     bool
         Whether or not keypoints can be used in scipy.spatial.ConvexHull
     """
     valid = True
+    # Make sure there are at least 3 different points
     valid *= len(np.unique(kpts, axis=0)) >= 3
-    valid *= [len(np.unique(kpts)) > 1 for kpts in kpts.T] == [True, True]
-    valid *= len(np.unique(np.diff(kpts, axis=1))) > 1
+    # Make sure all points are not on the same line
+    valid *= not check_same_line(kpts)
     return valid
 
 
-def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=True, use_body_face_kpts=False, use_body_hand_kpts=False, downsampling='max_pooling'):
+def kpts_to_parts(keypoints_dir, image_shape, parts_dim=15, use_face_kpts=True, use_hand_kpts=True, use_body_face_kpts=False, use_body_hand_kpts=False, downsampling='max_pooling'):
     """Converts a directory of saved openpose keypoints into a 3d array of downsampled body features.
-    
+
     Parameters
     ----------
     keypoints_dir : str
         Location from which to read all keypoint jsons.
     image_shape : tuple
         Tuple of (n_row_pixels, n_col_pixels)
+    parts_dim : int, optional
+        Dimension of body features--e.g. 15 will yield 6 x 15 x 15 = 1350 features.
     use_face_kpts : bool, optional
         Whether to draw faces based on more detailed face keypoints. Openpose call must have included --face
     use_hand_kpts : bool, optional
@@ -85,7 +110,7 @@ def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=
     downsampling : str, optional
         Downsampling method from full-res to 15x15 body features.
         Leave default for max pooling, any other value will result in cv2.INTER_AREA downsampling.
-    
+
     Returns
     -------
     TYPE
@@ -94,7 +119,7 @@ def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=
     jsons = sorted(glob.glob(keypoints_dir +
                              ('*' if keypoints_dir[-1] == '/' else '/*')))
     print(len(jsons), "jsons found")
-    part_features = np.empty((len(jsons), 1350))
+    part_features = np.empty((len(jsons), 6 * parts_dim**2))
     for filenum, filename in enumerate(jsons):
         with open(filename, "r") as f:
             kpts = f.read()
@@ -202,17 +227,36 @@ def kpts_to_parts(keypoints_dir, image_shape, use_face_kpts=True, use_hand_kpts=
             if len(right_feet_fill_pts) != 0:
                 cv2.fillConvexPoly(img=parts[5], points=np.array(
                     right_feet_fill_pts).astype('int32'), color=(1, 1, 1))
-#         [[plt.imshow(part), plt.title(filenum), plt.show()] for part in parts]
         # Downsampling
         if downsampling == 'max_pooling':
-            downsampled = np.empty((6, 15, 15))
-            splits = [np.array_split(split, 15, axis=2)
-                      for split in np.array_split(parts, 15, axis=1)]
-            for i in range(15):
-                for j in range(15):
+            downsampled = np.empty((6, parts_dim, parts_dim))
+            splits = [np.array_split(split, parts_dim, axis=2)
+                      for split in np.array_split(parts, parts_dim, axis=1)]
+            for i in range(parts_dim):
+                for j in range(parts_dim):
                     downsampled[:, i, j] = splits[i][j].max(1).max(1)
             part_features[filenum] = downsampled.flatten()
         else:
             part_features[filenum] = np.array([cv2.resize(
-                part, (15, 15), interpolation=cv2.INTER_AREA).flatten() for part in parts]).flatten()
+                part, (parts_dim, parts_dim), interpolation=cv2.INTER_AREA).flatten() for part in parts]).flatten()
     return part_features
+
+
+def bvp_to_parts(session, parts_dim, basedir, downsampling='max_pooling'):
+    part_features = []
+    files = sorted(glob.glob(f'{basedir}/*x150x*{session}*'))
+    for filename in files:
+        with h5py.File(filename, "r") as f:
+            full_data = np.array(f['data']).reshape(-1,6,150,150)
+        for parts in full_data:
+            downsampled = np.empty((6,parts_dim,parts_dim))
+            splits = [np.array_split(split, parts_dim, axis=2) for split in np.array_split(parts, parts_dim, axis=1)]
+            if downsampling == 'max_pooling':
+                for i in range(parts_dim):
+                    for j in range(parts_dim):
+                        downsampled[:,i,j] = (splits[i][j].max(1).max(1) > 0).astype(int)
+            else:
+                for i, part in enumerate(parts):
+                    downsampled[i] = cv2.resize(part, (parts_dim, parts_dim), interpolation=cv2.INTER_AREA)
+            part_features.append(downsampled.flatten())
+    return np.array(part_features)
