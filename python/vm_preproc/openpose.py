@@ -3,6 +3,7 @@ import cv2
 import json
 import glob
 import scipy
+import h5py
 
 # faces--fill
 faces_fill_idxs = (1, 17, 15, 16, 18,)
