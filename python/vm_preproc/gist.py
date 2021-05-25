@@ -1,12 +1,30 @@
-def preproc_gist(S, 
+"""Gist feature computation
+
+Based on Oliva & Torralba, 
+
+also on this implementation of same algorithm:
+
+https://github.com/Kalafinaian/python-img_gist_feature/tree/master/img_gist_feature
+
+
+"""
+
+import numpy as np
+from skimage.measure import block_reduce
+import matplotlib.pyplot as plt
+from matplotlib import cm, colors, transforms
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
+import cv2
+
+
+def compute_gist(S, 
     image_size=None, 
     orientations_per_scale=(8,8,8,8),
     number_blocks=4,
     fc_prefilt=4,
-    boundary_extension=32):
-# Note: n_resize is set to 128, boundary_extension is set to that // 4 or 32, 
-# unclear which is better to set. 
-
+    boundary_extension=None,
+    downsample_fn='mean'):
     """ compute gist features a la Oliva & Torralba 2001
 
     Preprocess image stack with gist model. Based on A. Oliva & A. Torralba's
@@ -14,259 +32,202 @@ def preproc_gist(S,
 
     Parameters
     ----------
-    S : 3D image matrix (Time, X,Y)
-      Stack of images to be processed, should also be
-      luminance images - process/remove color before getting here! 
+    S : 3D image matrix (time, x, y)
+        Stack of images to be processed, should be luminance images
     image_size : nan
-          Size to which to resize images; if values is nan, or if field:
-          is removed, input images are not resized. Default = nan
-      orientations_per_scale = [8 8 8 8]
-      number_blocks = 4
-      fc_prefilt = 4
-      boundary_extension : int
-           number of pixels to pad
+        Size to which to resize images; if values is nan, n_orientations_per_scale if field:
+        is removed, input images are not resized
+    orientations_per_scale : list or tuple
+        Number of orientation at each scale. Scales are determined by...
+        what, again?
+    number_blocks : int
+        Number of blocks on each side into which to downsample the image; 
+        i.e. 4 yeilds a 4 x 4 grid of block downsampling
+    fc_prefilt : int
+        frequency cutoff for pre-filtering (low frequencies below this
+        number of cycles per image are removed prior to gist Gabor filtering)
+    boundary_extension : int
+        number of pixels to pad before computing Fourier transform. If None, 
+        defaults to 1/16 of `image_size` (for 512 px images, 32 px padding)
 
     Returns
     -------
+
+    Notes
+    -----
+
     References
     ----------
     Modeling the shape of the scene: a holistic representation of the spatial envelope
     Aude Oliva, Antonio Torralba
     International Journal of Computer Vision, Vol. 42(3): 145-175, 2001.
+    
+    Much copying from:
+    https://github.com/Kalafinaian/python-img_gist_feature/tree/master/img_gist_feature
+    ... with much reorganization.
     """
 
     # resize and crop image to make it square
-    if image size is None:
+    if image_size is None:
         image_size = S.shape[1:3]
         img = S
     else:
         # TO DO.
         img = imresizecrop(S, image_size, 'bilinear')
 
-    # Define Gabors
-    G = create_gabor(orientations_per_scale, image_size + 2 * boundary_extension)
+    if boundary_extension is None:
+        # Default to 1/16 of image size
+        boundary_extension = image_size[0] // 16
 
-    # Precompute number of filter transfer functions 
-    #Nfeatures = size(G,3)*number_blocks^2
-    #Spreproc = zeros([Nscenes Nfeatures], 'single')
+    ds_fn = getattr(np, downsample_fn)
+    # Define Gabors
+    img_size_pad = image_size[0] + 2 * boundary_extension
+    gist_gabors = create_gabor(orientations_per_scale, img_size_pad)
 
     # scale intensities to be in the range [0 255]
-    img = img - img.min()
+    img -= img.min()
     img = 255 * img / img.max()
+    # Better: for each image (OOPS should have done this for earlier papers)
+    # img -= img.min(-1).min(-1)[:,np.newaxis, np.newaxis]
+    # img = 255 * img / img.max(-1).max(-1)[:, np.newaxis, np.newaxis]
     # prefiltering: local contrast scaling
-    output    = prefilt(img, fc_prefilt)
+    output = prefilt(img, fc_prefilt, pad_pixels=boundary_extension)
     # compute gist:
-    Spreproc = gist_gabor(output, G=G).T
+    spreproc = gist_gabor(output, boundary_extension, gist_gabors, number_blocks, downsample_fn=ds_fn)
+    return spreproc
 
-"""
-def prefilt(img, fc=4, n_pad=5):
-    # ima = prefilt(img, fc)
-    # fc  = 4 (default)
-    # 
-    # Input images are double in the range [0, 255]
-    # You can also input a block of images [ncols nrows 3 Nimages]
-    #
-    # For color images, normalization is done by dividing by the local:
-    # luminance variance.
+
+def prefilt(img, fc_prefilt=4, pad_pixels=None):
+    """Summary
     
-    s1 = fc / np.sqrt(np.log(2))
-
-    # Pad images to reduce boundary artifacts
-    img = np.log(img + 1)
-    #img = padarray(img, [n_pad n_pad], 'symmetric')
-    img = np.pad(img, [(0,0), (n_pad n_pad), (n_pad n_pad)], mode='reflect')
-    #[sn, sm, c, N] = size(img)
-    N, sn, sm, c = img.shape
-    n = np.max([sn, sm])
-    n = n + np.mod(n, 2)
-    #img = padarray(img, [n-sn n-sm], 'symmetric','post')
-    img = padarray(img, [n-sn n-sm], 'symmetric','post')
-
-    # Filter
-    [fx, fy] = meshgrid(-n/2:n/2-1)
-    gf = fftshift(exp(-(fx.^2+fy.^2)/(s1^2)))
-    gf = repmat(gf, [1 1 c N])
-
-    # Whitening
-    output = img - real(ifft2(fft2(img).*gf))
-    clear img
-
-    # Local contrast normalization
-    localstd = repmat(sqrt(abs(ifft2(fft2(mean(output,3).^2).*gf(:,:,1,:)))), [1 1 c 1]) 
-    output = output./(.2+localstd)
-
-    # Crop output to have same size as the input
-    output = output[n_pad + 1: sn - n_pad, n_pad+1:sm-n_pad,:,:]
-    return output
-"""
-def prefilt(img, fc_prefilt=4, n_pad=5):
+    Parameters
+    ----------
+    img : array
+        image stack to be pre-filtered
+    fc_prefilt : int, optional
+        Description
+    pad_pixels : int, optional
+        Number of pixels with which to pad the image on each side
+        before taking Fourier transform
+    
+    Returns
+    -------
+    array
+        filtered image stack
+    """
+    image_size_orig, _, n_frames = img.shape
     log_img = np.log(img + 1.0)
-    pad_img = np.pad(log_img,((n_pad,n_pad), (n_pad,n_pad)), 'symmetric')
-
-    ##
-    # gf...
-    n_s1 = fc_prefilt / np.sqrt(np.log(2))
-    n_boundary = n_resize + 2 * n_pad
-         
-        np_linear = np.linspace(-n_boundary//2, n_boundary//2-1, n_boundary)
-        np_fx, np_fy = np.meshgrid(np_linear, np_linear)
-        
-#        np_gf = np.fft.fftshift(np.exp( -(np_fx **2 + np_fy **2)/(n_s1 ** 2)))
-        self.np_gf = np.fft.fftshift(np.exp( -(np_fx **2 + np_fy **2)/(n_s1 ** 2)))
-    ###    
-
-    gf = self.gf
-    out = pad_img - np.real(np.fft.ifft2(np.fft.fft2(pad_img) * gf ))
-    
-    local = np.sqrt(np.abs(np.fft.ifft2(np.fft.fft2(out **2) * gf)))
+    pad_img = np.pad(log_img,((0, 0), (pad_pixels,pad_pixels), (pad_pixels,pad_pixels)), 'symmetric')
+    n_frames, _, image_size_pad = pad_img.shape
+    # This defines the standard deviation of the Gaussian function below
+    low_freq_sigma = fc_prefilt / np.sqrt(np.log(2))
+    # Create filter (`gf`) for .... local contrast? 
+    t = np.linspace(-image_size_pad // 2, image_size_pad // 2 - 1, image_size_pad)
+    np_fx, np_fy = np.meshgrid(t, t)
+    # Exponential function - a Gaussian - with standard deviation `low_freq_sigma`
+    low_freq_gauss = np.fft.fftshift(np.exp( -(np_fx **2 + np_fy **2) / (low_freq_sigma ** 2)))
+    # Approximation to whitening: removing low frequencies
+    out = pad_img - np.real(np.fft.ifft2(np.fft.fft2(pad_img) * low_freq_gauss))
+    # Local contrast normalization
+    local = np.sqrt(np.abs(np.fft.ifft2(np.fft.fft2(out ** 2) * low_freq_gauss)))
+    # What is this 0.2? 
     out = out / (0.2 + local)
+    # Crop output to have same size as the input
+    #out = out[pad_pixels: img_size_pad - pad_pixels, pad_pixels : img_size_pad - pad_pixels]
+    return out
+
+
+def gist_gabor(img_padded, pad_pixels, gist_gabors, number_blocks, downsample_fn=np.mean):
+    """Summary
     
-    n_size = self.n_resize + 2 * n_pad
+    Parameters
+    ----------
+    pad_pixels : TYPE
+        Description
+    gist_gabors : TYPE
+        Description
     
-    return out[n_pad: n_size - n_pad, n_pad : n_size - n_pad]
+    Returns
+    -------
+    TYPE
+        Description
+    """
+    # Pad image
+    #img_padded = np.pad(np_prefilt_img, 
+    #    ((pad_pixels, pad_pixels), (pad_pixels, pad_pixels)), 
+    #    'symmetric')
+    n_frames = img_padded.shape[0]
+    # Take Fourier transform of image
+    img_fft = np.fft.fft2(img_padded)
+    # Assumes symmetric (square)    
+    img_size, _, n_filter = gist_gabors.shape
+    nb = number_blocks**2 # n blocks
+    n_features = n_filter * nb
+    gist_features = np.zeros((n_frames, n_features), dtype=np.float32)
+    for i in range(n_filter):
+        np_res = np.abs(np.fft.ifft2(img_fft * gist_gabors[:,:,i]))
+        # Clip padding
+        np_res = np_res[:, pad_pixels: img_size - pad_pixels, pad_pixels : img_size - pad_pixels]
+        # Downsample by blocks; assume square for now
+        block_size = img_size / number_blocks
+        if block_size % 1 != 0:
+            raise ValueError('Image size does not divide evenly into %d blocks!'%number_blocks)
+        block_size = int(block_size)
+        gist_ft = block_reduce(np_res, (1, block_size, block_size), func=downsample_fn)
+        gist_features[:,i*nb:(i+1)*nb] = gist_ft.reshape(-1, nb)
+    
+    return gist_features
 
 
-
-
-def gist_gabor(img, params):
-    # 
-    # Input:
-    #   img = input image (it can be a block: [nrows, ncols, c, Nimages])
-    #   w = number of windows (w*w)
-    #   G = precomputed transfer functions
-    #
-    # Output:
-    #   g: are the global features = [Nfeatures Nimages], 
-    #                    Nfeatures = w*w*Nfilters*c
-
-    img = single(img)
-
-    w = number_blocks
-    G = G
-    be = boundary_extension
-    switch ndims(img)
-        case {2,3}
-            # For now: assume 3D images are stacks of luminance images (unless:
-            # c==3, then assume a single color image, handled below)
-            [~,~,c] = size(img)
-            N = c
-        case 4
-            # For a stack of color images, treat color channels as separate images.:
-            [nrows,ncols,c,N] = size(img)
-            img = reshape(img, [nrows ncols c*N])
-            N = c*N
-
-
-    [ny,nx,Nfilters] = size(G)
-    W = w*w
-    g = zeros([W*Nfilters N])
-
-    # pad image
-    img = padarray(img, [be be], 'symmetric')
-
-    img = single(fft2(img)) 
-    k=0
-    for n = 1:Nfilters:
-        # Display progress through filters
-        progressdot(n,10,100,Nfilters)
-
-        ig = abs(ifft2(img.*repmat(G(:,:,n), [1 1 N]))) 
-        ig = ig(be+1:ny-be, be+1:nx-be, :)
+def create_gabor(orientations_per_scale, gabor_size):
+    """Summary
+    
+    Parameters
+    ----------
+    orientations_per_scale : TYPE
+        Description
+    gabor_size : TYPE
+        Description
+    
+    Returns
+    -------
+    array
+        array of filters in Fourier space at different sizes 
+        and orientations
+    """
+    ori_per_sc = orientations_per_scale
+    
+    n_scales = len(ori_per_sc)
+    n_filters = sum(ori_per_sc)
+    
+    gabor_params = np.zeros((n_filters, 4), dtype = np.float64)
+    iparam = 0
+    for i in range(n_scales):
+        for j in range(0, ori_per_sc[i]):
+            gabor_params[iparam, 0] = 0.35
+            gabor_params[iparam, 1] = 0.3 / (1.85**i)
+            gabor_params[iparam, 2] = 16 *(ori_per_sc[i]**2) / (32**2)
+            gabor_params[iparam, 3] = np.pi / ori_per_sc[i] * j
+            
+            iparam += 1
+    
+    t = np.linspace(-gabor_size // 2, gabor_size // 2 - 1, gabor_size)
+    np_fx, np_fy = np.meshgrid(t, t)
+    np_res_A = np.fft.fftshift(np.sqrt(np_fx ** 2 + np_fy**2))
+    np_res_B = np.fft.fftshift(np.angle(np_fx + 1j * np_fy))
+    
+    gist_gabors = np.zeros((gabor_size, gabor_size, n_filters), dtype = np.float64)
+    for i in range(n_filters):
+        np_tr = np_res_B + gabor_params[i,3]
+        np_A  = (np_tr < -np.pi) + 0.0
+        np_B  = (np_tr > np.pi) + 0.0
         
-        v = downN(ig, w)
-        g(k+1:k+W,:) = reshape(v, [W N])
-        k = k + W
-        drawnow
+        np_tr = np_tr + 2 *np.pi * np_A - 2*np.pi*np_B
+        np_every_gabor = np.exp(-10 * gabor_params[i,0] * ((np_res_A / gabor_size /gabor_params[i,1] - 1) **2) - 2*gabor_params[i,2]*np.pi*(np_tr **2))
+        
+        gist_gabors[:,:,i] = np_every_gabor
 
-
-    if c == 3:
-        # If the input was a color image, then reshape 'g' so that one column:
-        # is one images output:
-        g = reshape(g, [size(g,1)*3 size(g,2)/3])
-
-    return g
-
-
-def = downN(x, N):
-    # averaging over non-overlapping square image blocks
-    #
-    # Input
-    #   x = [nrows ncols nchanels]
-    # Output
-    #   y = [N N nchanels]
-
-    nx = fix(linspace(0,size(x,1),N+1))
-    ny = fix(linspace(0,size(x,2),N+1))
-    y  = zeros(N, N, size(x,3))
-    for xx=1:N:
-      for yy=1:N:
-        v=mean(mean(x(nx(xx)+1:nx(xx+1), ny(yy)+1:ny(yy+1),:),1),2)
-        y(xx,yy,:)=v(:)
-
-
-
-
-def create_gabor(or, n):
-#
-# G = create_gabor(numberOforientations_per_scale, n)
-#
-# Precomputes filter transfer functions. All computations are done on the
-# Fourier domain. 
-#
-# If you call this function without output arguments it will show the:
-# tiling of the Fourier domain.
-#
-# Input
-#     numberOforientations_per_scale = vector that contains the number of
-#                                orientations at each scale (from HF to BF)
-#     n = image_size = [nrows ncols] 
-#
-# output
-#     G = transfer functions for a jet of gabor filters:
-
-
-Nscales = length(or)
-Nfilters = sum(or)
-
-if length(n) == 1:
-    n = [n(1) n(1)]
-
-l=0
-for i=1:Nscales:
-    for j=1:or(i):
-        l=l+1
-        params(l,:)=[.35 .3/(1.85^(i-1)) 16*or(i)^2/32^2 pi/(or(i))*(j-1)]
-
-
-# Frequencies:
-#[fx, fy] = meshgrid(-n/2:n/2-1)
-[fx, fy] = meshgrid(-n(2)/2:n(2)/2-1, -n(1)/2:n(1)/2-1)
-fr = fftshift(sqrt(fx.^2+fy.^2))
-t = fftshift(angle(fx+sqrt(-1)*fy))
-
-# Transfer functions:
-G=zeros([n(1) n(2) Nfilters])
-for i=1:Nfilters:
-    tr=t+params(i,4) 
-    tr=tr+2*pi*(tr<-pi)-2*pi*(tr>pi)
-
-    G(:,:,i)=exp(-10*params(i,1)*(fr/n(2)/params(i,2)-1).^2-2*params(i,3)*pi*tr.^2)
-
-
-if nargout == 0:
-    figure
-    for i=1:Nfilters:
-        contour(fx, fy, fftshift(G(:,:,i)),[1 .7 .6],'r')
-        hold on
-
-    axis('on')
-    axis('equal')
-    axis([-n(2)/2 n(2)/2 -n(1)/2 n(1)/2])
-    axis('ij')
-    xlabel('f_x (cycles per image)')
-    ylabel('f_y (cycles per image)')
-    grid on
-
+    return gist_gabors
 
 
 ## Hmmm - resizing...
@@ -279,3 +240,78 @@ def img_resize(np_img_in, ln_resize, run_log=None, b_print=False):
         run_log and run_log.error(s_msg)
         b_print and print(s_msg)
         return None, -3
+
+def show_gist(gist_vec, n_oris=8, n_scales=4, n_loc=4, im=None, vmin=None, vmax=None, 
+              figsize=(7, 7), cmap=plt.cm.viridis, ax=None):
+    """Show gist features for a given gist vector
+    
+    Parameters"""
+    n_lines_per_scale = np.round(np.linspace(11, 1, n_scales)).astype(np.int) # [11, 7, 3, 1]
+    lw_per_scale = np.linspace(0.3, 10.0, n_scales)
+    delta = (1. / n_loc) /2.
+    dd = delta / np.sqrt(2)
+    oris = np.linspace(np.pi/2, 1.5*np.pi, n_oris, endpoint=False)
+    xlocs = np.linspace(1./n_loc, 1, n_loc) - delta
+    ylocs = np.linspace(1./n_loc, 1, n_loc) - delta
+    ylocs = ylocs[::-1]
+    #print(ylocs)
+    if vmin is None:
+        vmin = gist_vec.min()
+    if vmax is None:
+        vmax = gist_vec.max()
+    nrm = Normalize(vmin=vmin, vmax=vmax, clip=True)
+    gv = nrm(gist_vec)
+    colors = []
+    edges = []
+    linewidths = []
+    # Define figure
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    if im is not None:
+        ax.imshow(im, extent=[0, 1, 0, 1])
+    i = 0
+    # Scales
+    for n_lines, lw in zip(n_lines_per_scale, lw_per_scale):
+        # Orientations
+        for ori in oris:
+            # Positions
+            for xloc in xlocs:
+                for yloc in ylocs:
+                    # Define a set of vertical lines
+                    x = np.array([[-delta, delta]] * n_lines)
+                    x /= np.sqrt(2.0)
+                    if n_lines > 1:
+                        y = np.array([np.linspace(-delta, delta, n_lines)]*2).T
+                    else:
+                        y = np.array([[0., 0.]])
+                    y /= np.sqrt(2.0)
+                    base = ax.transData
+                    rot = transforms.Affine2D()
+                    rot.rotate(ori)
+                    rot.translate(xloc, yloc)
+                    xy = np.vstack([x.flatten(), y.flatten()]).T
+                    xyt = rot.transform_affine(xy)
+                    xt, yt = xyt.T
+                    xt = np.reshape(xt, (n_lines, 2))
+                    yt = np.reshape(yt, (n_lines, 2))
+                    edges_ = [list(zip(x_, y_)) for x_, y_ in zip(xt,  yt)]
+                    lw_ = [lw]*n_lines
+                    a = np.array([gv[i]]*n_lines)
+                    colors_ = cmap(a)
+                    #if colors_.shape[1] < 4:
+                    #    colors_ = np.hstack([colors_, np.ones((colors.shape[0], )) * gv[i]])
+                    if vmin==-vmax:
+                        # assume absolute scale
+                        alpha = (np.abs(gv[i]-0.5) * 2)**2
+                    else:
+                        alpha = gv[i]**2   
+                    colors_[:, 3] = np.ones((colors_.shape[0], )) * alpha
+                    colors.append(colors_)
+                    edges += edges_
+                    linewidths += (lw_)
+                    i += 1
+    colors = np.vstack(colors)
+    lc = LineCollection(edges, colors=colors, linewidth=linewidths) #[tuple(c) for c in colors])
+    ax.add_collection(lc)
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
