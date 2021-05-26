@@ -37,9 +37,8 @@ def compute_gist(S,
     ----------
     S : 3D image matrix (time, x, y)
         Stack of images to be processed, should be luminance images
-    image_size : nan
-        Size to which to resize images; if values is nan, n_orientations_per_scale if field:
-        is removed, input images are not resized
+    image_size : None
+        Size to which to resize images; if None, no resizing
     orientations_per_scale : list or tuple
         Number of orientation at each scale. Scales are determined by...
         what, again?
@@ -91,18 +90,25 @@ def compute_gist(S,
     gist_gabors = create_gabor(orientations_per_scale, image_size_pad)
 
     # scale intensities to be in the range [0 255]
-    img -= img.min()
-    img = 255 * img / img.max()
+    #img -= img.min()
+    #img = 255 * img / img.max()
     # Better: for each image (OOPS should have done this for earlier papers)
-    # img -= img.min(-1).min(-1)[:,np.newaxis, np.newaxis]
-    # img = 255 * img / img.max(-1).max(-1)[:, np.newaxis, np.newaxis]
+    img -= img.min(-1).min(-1)[:,np.newaxis, np.newaxis]
+    img = 255 * img / img.max(-1).max(-1)[:, np.newaxis, np.newaxis]
     # prefiltering: local contrast scaling
-    print('pre-filtering out low spatial frequencies...')
+    print('filtering out low spatial frequencies...')
     output = prefilt(img, fc_prefilt, pad_pixels=fc_boundary_extension)
     # compute gist:
     print('computing gist features...')
-    spreproc = gist_gabor(output, boundary_extension, gist_gabors, number_blocks, downsample_fn=ds_fn)
-    return spreproc
+    output = gist_gabor(output, boundary_extension, gist_gabors, number_blocks, downsample_fn=ds_fn)
+    params = dict(
+        orientations_per_scale=orientations_per_scale,
+        boundary_extension=boundary_extension,
+        fc_boundary_extension=fc_boundary_extension,
+        number_blocks=number_blocks,
+        downsample_fn=downsample_fn,
+        )
+    return output, params
 
 
 def prefilt(img, fc_prefilt=4, pad_pixels=5):
