@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm, colors, transforms
 from matplotlib.collections import LineCollection
 from matplotlib.colors import Normalize
+#import tqdm
 import cv2
 
 
@@ -23,8 +24,10 @@ def compute_gist(S,
     orientations_per_scale=(8,8,8,8),
     number_blocks=4,
     fc_prefilt=4,
+    fc_boundary_extension=5,
     boundary_extension=None,
     downsample_fn='mean'):
+    #progress_bar=tqdm.tqdm):
     """ compute gist features a la Oliva & Torralba 2001
 
     Preprocess image stack with gist model. Based on A. Oliva & A. Torralba's
@@ -80,9 +83,12 @@ def compute_gist(S,
         boundary_extension = image_size[0] // 16
 
     ds_fn = getattr(np, downsample_fn)
+    
+    # Note that image must be odd in dimensions for fft filtering to work
+    # correctly.
+    image_size_pad = image_size[0] + 2 * boundary_extension + image_size[0] % 2
     # Define Gabors
-    img_size_pad = image_size[0] + 2 * boundary_extension
-    gist_gabors = create_gabor(orientations_per_scale, img_size_pad)
+    gist_gabors = create_gabor(orientations_per_scale, image_size_pad)
 
     # scale intensities to be in the range [0 255]
     img -= img.min()
@@ -91,13 +97,15 @@ def compute_gist(S,
     # img -= img.min(-1).min(-1)[:,np.newaxis, np.newaxis]
     # img = 255 * img / img.max(-1).max(-1)[:, np.newaxis, np.newaxis]
     # prefiltering: local contrast scaling
-    output = prefilt(img, fc_prefilt, pad_pixels=boundary_extension)
+    print('pre-filtering out low spatial frequencies...')
+    output = prefilt(img, fc_prefilt, pad_pixels=fc_boundary_extension)
     # compute gist:
+    print('computing gist features...')
     spreproc = gist_gabor(output, boundary_extension, gist_gabors, number_blocks, downsample_fn=ds_fn)
     return spreproc
 
 
-def prefilt(img, fc_prefilt=4, pad_pixels=None):
+def prefilt(img, fc_prefilt=4, pad_pixels=5):
     """Summary
     
     Parameters
@@ -117,7 +125,7 @@ def prefilt(img, fc_prefilt=4, pad_pixels=None):
     """
     image_size_orig, _, n_frames = img.shape
     log_img = np.log(img + 1.0)
-    pad_img = np.pad(log_img,((0, 0), (pad_pixels,pad_pixels), (pad_pixels,pad_pixels)), 'symmetric')
+    pad_img = np.pad(log_img, ((0, 0), (pad_pixels, pad_pixels), (pad_pixels, pad_pixels)), 'symmetric')
     n_frames, _, image_size_pad = pad_img.shape
     # This defines the standard deviation of the Gaussian function below
     low_freq_sigma = fc_prefilt / np.sqrt(np.log(2))
@@ -133,11 +141,11 @@ def prefilt(img, fc_prefilt=4, pad_pixels=None):
     # What is this 0.2? 
     out = out / (0.2 + local)
     # Crop output to have same size as the input
-    #out = out[pad_pixels: img_size_pad - pad_pixels, pad_pixels : img_size_pad - pad_pixels]
+    out = out[:, pad_pixels: image_size_pad - pad_pixels, pad_pixels : image_size_pad - pad_pixels]
     return out
 
 
-def gist_gabor(img_padded, pad_pixels, gist_gabors, number_blocks, downsample_fn=np.mean):
+def gist_gabor(img, pad_pixels, gist_gabors, number_blocks, downsample_fn=np.mean):
     """Summary
     
     Parameters
@@ -153,26 +161,28 @@ def gist_gabor(img_padded, pad_pixels, gist_gabors, number_blocks, downsample_fn
         Description
     """
     # Pad image
-    #img_padded = np.pad(np_prefilt_img, 
-    #    ((pad_pixels, pad_pixels), (pad_pixels, pad_pixels)), 
-    #    'symmetric')
-    n_frames = img_padded.shape[0]
+    n_frames, image_size, _ = img.shape
+    img_padded = np.pad(img, 
+        ((0, 0), (pad_pixels, pad_pixels), (pad_pixels, pad_pixels)), 
+        'symmetric')
     # Take Fourier transform of image
     img_fft = np.fft.fft2(img_padded)
     # Assumes symmetric (square)    
-    img_size, _, n_filter = gist_gabors.shape
+    image_size_pad, _, n_filter = gist_gabors.shape
     nb = number_blocks**2 # n blocks
     n_features = n_filter * nb
     gist_features = np.zeros((n_frames, n_features), dtype=np.float32)
     for i in range(n_filter):
         np_res = np.abs(np.fft.ifft2(img_fft * gist_gabors[:,:,i]))
         # Clip padding
-        np_res = np_res[:, pad_pixels: img_size - pad_pixels, pad_pixels : img_size - pad_pixels]
+        np_res = np_res[:, pad_pixels:-pad_pixels, pad_pixels:-pad_pixels]
+        #print(np_res.shape)
         # Downsample by blocks; assume square for now
-        block_size = img_size / number_blocks
+        block_size = image_size / number_blocks
         if block_size % 1 != 0:
             raise ValueError('Image size does not divide evenly into %d blocks!'%number_blocks)
         block_size = int(block_size)
+        #print(block_size)
         gist_ft = block_reduce(np_res, (1, block_size, block_size), func=downsample_fn)
         gist_features[:,i*nb:(i+1)*nb] = gist_ft.reshape(-1, nb)
     
@@ -275,8 +285,8 @@ def show_gist(gist_vec, n_oris=8, n_scales=4, n_loc=4, im=None, vmin=None, vmax=
         # Orientations
         for ori in oris:
             # Positions
-            for xloc in xlocs:
-                for yloc in ylocs:
+            for yloc in ylocs:
+                for xloc in xlocs:
                     # Define a set of vertical lines
                     x = np.array([[-delta, delta]] * n_lines)
                     x /= np.sqrt(2.0)
