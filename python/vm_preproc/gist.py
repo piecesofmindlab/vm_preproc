@@ -36,7 +36,7 @@ def preproc_gist(S,
     """
 
     # resize and crop image to make it square
-    if image size is None:
+    if image_size is None:
         image_size = S.shape[1:3]
         img = S
     else:

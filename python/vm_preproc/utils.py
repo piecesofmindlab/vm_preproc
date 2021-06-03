@@ -499,4 +499,4 @@ def batch_run(fn, inpt,
             outpt.close()
         elif output_option=='video':
             outpt.stop()
-        raise
+        raise Exception("Failed during run!")
