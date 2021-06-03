@@ -10,6 +10,7 @@ from . import general
 from . import image
 from . import fourier_power
 from . import normals
+from . import gist
 #from . import anonymize # Crappy opencv version bug
 from . import motion_energy
 from . import gridlike_code
@@ -21,6 +22,7 @@ __all__ = ['options',
 			'general',
 			'image',
 			'fourier_power',
+			'gist',
 			#'anonymize', 
 			'normals', 
 			'motion_energy',
