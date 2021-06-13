@@ -206,12 +206,12 @@ class DataSet(object):
         self._n_frames = None
         self._data = data
 
-    def load(self, variable_name=None, idx=None):
+    def load(self, variable_name=None, idx=None, **kwargs):
         """Load data into memory"""
         if self._data is None:
             if variable_name is None:
                 variable_name = self.variable_name
-            return file_io.load_array(self.fpath, variable_name, idx=idx)
+            return file_io.load_array(self.fpath, variable_name, idx=idx, **kwargs)
         else: 
             if idx is None:
                 return self._data
@@ -259,9 +259,9 @@ class MultiPartDataSet(object):
         else:
             self.variable_names = variable_names
     
-    def load(self, idx=None):
+    def load(self, idx=None, **kwargs):
         if self._data is None:
-            return dict((k, file_io.load_array(self.fpaths[k], variable_name=self.variable_names[k], idx=idx)) for k in self.fpaths.keys())
+            return dict((k, file_io.load_array(self.fpaths[k], variable_name=self.variable_names[k], idx=idx, **kwargs)) for k in self.fpaths.keys())
         else:
             return dict((k, v[idx[0]:idx[1]]) for k, v in self._data.items())
     
@@ -284,6 +284,7 @@ def batch_run(fn, inpt,
     output_resolution=None,
     batch_combine_fn=np.vstack,
     sleep_time=0.3,
+    load_kws=None,
     #first_frame=None, # TO DO?
     #last_frame=None, # TO DO? 
     **kwargs):
@@ -412,6 +413,8 @@ def batch_run(fn, inpt,
     try:
         kws = get_default_kwargs(inpt.load)
         kws_fn = get_default_kwargs(fn)
+        if load_kws is None:
+            load_kws = {}
         # Remove progress bar kwarg if not supported
         if (not 'progress_bar' in kws_fn) and ('progress_bar' in kwargs):
             _ = kwargs.pop('progress_bar')
@@ -424,9 +427,9 @@ def batch_run(fn, inpt,
             idx = (st, fin)
             # Load input
             if 'variable_name' in kws:
-                stim = inpt.load(idx=idx, variable_name=kws['variable_name'])
+                stim = inpt.load(idx=idx, variable_name=kws['variable_name'], **load_kws)
             else:
-                stim = inpt.load(idx=idx)
+                stim = inpt.load(idx=idx, **load_kws)
             # Run function on this batch
             if isinstance(stim, dict):
                 out = fn(**stim, **kwargs)
