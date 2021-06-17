@@ -1,5 +1,6 @@
 import numpy as np
 from . import utils
+import plot_utils
 
 def bin_heading_simple(angles, n=12, remove_nans=True):
     """Bin a heading (in degrees) into `n` bins
@@ -44,7 +45,7 @@ def plot_heading(angle, image=None, figsize=(8, 6), ccol=(0.8, 0.8, 0.8), acol='
     else:
         ax0.imshow(image)        
     ax.view_init(azim=90, elev=30)
-    cpos = vmt.plot_utils.circle_pos(1.0, 32)
+    cpos = plot_utils.circle_pos(1.0, 32)
     cpos = np.vstack([cpos, cpos[0]])
     ax.plot(*cpos.T, np.zeros((len(cpos),)), '-', color=ccol)
     ax.plot([0, np.cos(angle + np.pi/2)], [0, np.sin(angle+np.pi/2)], [0, 0], color=acol)
