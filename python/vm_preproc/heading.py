@@ -1,4 +1,5 @@
 import numpy as np
+from . import utils
 
 def bin_heading_simple(angles, n=12, remove_nans=True):
     """Bin a heading (in degrees) into `n` bins
@@ -18,7 +19,7 @@ def bin_heading_simple(angles, n=12, remove_nans=True):
     # Define bin centers
     abins = np.linspace(-180, 180, n, endpoint=False)
     # Compute distance to each heading bin
-    ang_dist = np.abs(np.degrees(vmp.utils.circ_dist(np.radians(st), np.radians(abins))))
+    ang_dist = np.abs(np.degrees(utils.circ_dist(np.radians(angles), np.radians(abins))))
     # soft histogram
     out = np.maximum(0, bin_width - ang_dist) / bin_width
     if remove_nans:

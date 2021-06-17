@@ -49,7 +49,7 @@ def image_skewness(S, ):
         luminance image, time x vertical x horizontal
         for now, MUST be luminace image.
     """
-    assert np.dim(S) == 3 else 'Must be time x luminance image'
+    assert np.dim(S) == 3, 'Must be time x luminance image'
     n = S.shape[0]
     skewness = np.zeros((n,))
     for s in S:
