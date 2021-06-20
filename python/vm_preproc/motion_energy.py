@@ -268,7 +268,7 @@ def show_motion_energy(features, params, ax=None, is_overlay=False,
         ax.add_collection(LC)
     # Add dots for sf=0
     if np.any(i0):
-        plt.scatter(xs[sf0_idx], (1-ys[sf0_idx]), color=cols[sf0_idx, :], s=mksz[i0])
+        plt.scatter(xs[i0], (1-ys[i0]), color=cols[i0, :], s=mksz[i0])
     # Final Setup
     plt.setp(ax, aspect='equal', xlim=(0, width), ylim=(0, height), xticks=(), yticks=())
     pdict = dict(color=bg_col, alpha=1) 
