@@ -3,6 +3,23 @@ import cv2
 import tqdm
 
 
+def arraydict_to_dictlist(arraydict):
+    """Convert from dict of arrays to pupil format list of dicts"""
+    dict_fields = list(arraydict.keys())
+    first_key = dict_fields[0]
+    n = len(arraydict[first_key])
+    out = []
+    for j in range(n):
+        frame_dict = {}
+        for k in dict_fields:
+            value = arraydict[k][j]
+            if isinstance(value, np.ndarray):
+                value = value.tolist()
+            frame_dict[k] = value
+        out.append(frame_dict)
+    return out
+
+
 def detect_checkerboard(timestamps, video_data, checkerboard_size=(6, 8), scale=None, progress_bar=tqdm.tqdm):
     """Use opencv to detect checkerboard pattern
 
@@ -95,5 +112,5 @@ def find_checkerboard(
     reference_dict['mean_location'] = np.asarray(mean_locations)
     reference_dict['mean_norm_pos'] = np.asarray(mean_norm_pos)
     reference_dict['timestamp'] = np.asarray(times)
-    out = data_analysis.gaze_utils.arraydict_to_dictlist(reference_dict)
+    out = arraydict_to_dictlist(reference_dict)
     return out
