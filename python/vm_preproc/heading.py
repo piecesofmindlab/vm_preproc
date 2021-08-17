@@ -16,7 +16,7 @@ def bin_heading_simple(angles, n=12, remove_nans=True):
     -----
     Currently only evenly spaced bins
     """
-    if np.ndims(angles) == 1:
+    if np.ndim(angles) == 1:
         angles = angles[:, np.newaxis]
     bin_width = 360 / n
     # Define bin centers
