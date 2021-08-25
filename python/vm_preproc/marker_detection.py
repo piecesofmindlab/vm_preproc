@@ -62,7 +62,7 @@ def find_checkerboard(
 ):
     """Use opencv to detect checkerboard pattern"""
     if progress_bar is None:
-        progress_bar = lambda x: x
+        progress_bar = lambda x, total=0: x
     if scale is None:
         scale = 1.0
     rows, cols = checkerboard_size
@@ -107,19 +107,19 @@ def find_checkerboard(
             # frame = cv2.drawChessboardCorners(color_frame, (6, 8), corners, ret)
             # corners[:, 0] = corners[:, 0] * (1 / scale)
             # corners[:, 1] = corners[:, 1] * (1 / scale)
-            locations.append(corners * 1/scale_factor)
-            marker_position = np.mean(corners, axis=0)
+            locations.append(corners * 1 / scale_factor)
+            marker_position = np.mean(corners * 1 / scale_factor, axis=0)
             mean_locations.append(marker_position)
-            corners_noramlized = corners / np.array([hdim, vdim])
+            corners_normalized = corners / np.array([hdim, vdim])
             norm_pos.append(corners_normalized)
             marker_position_normalized = np.mean(corners_normalized, axis=0)
             mean_norm_pos.append(marker_position_normalized)
 
     reference_dict = {}
-    reference_dict['location'] = np.asarray(locations)
-    reference_dict['norm_pos'] = np.asarray(norm_pos)
-    reference_dict['mean_location'] = np.asarray(mean_locations)
-    reference_dict['mean_norm_pos'] = np.asarray(mean_norm_pos)
+    reference_dict['location_full_checkerboard'] = np.asarray(locations)
+    reference_dict['norm_pos_full_checkerboard'] = np.asarray(norm_pos)
+    reference_dict['location'] = np.asarray(mean_locations)
+    reference_dict['norm_pos'] = np.asarray(mean_norm_pos)
     reference_dict['timestamp'] = np.asarray(times)
     out = arraydict_to_dictlist(reference_dict)
     return out
