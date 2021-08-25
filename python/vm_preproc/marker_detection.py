@@ -63,7 +63,8 @@ def find_checkerboard(
     """Use opencv to detect checkerboard pattern"""
     if progress_bar is None:
         progress_bar = lambda x: x
-
+    if scale is None:
+        scale = 1.0
     rows, cols = checkerboard_size
     n_frames, vdim, hdim = video_data.shape[:3]
     times = []  # frame timestamps for detected keypoints
@@ -83,8 +84,17 @@ def find_checkerboard(
             # color_frame = copy.deepcopy(cv2.resize(frame, None, fx=scale, fy=scale))
             # color_frame = cv2.cvtColor(color_frame, cv2.COLOR_RGB2BGR)
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        if scale is not None:
-            frame = cv2.resize(frame, None, fx=scale, fy=scale)
+        if isinstance(scale, (list,tuple)):
+            scale_x, scale_y =  scale
+            scale_factor_x = scale_x / frame.shape[1]
+            scale_factor_y = scale_y / frame.shape[0]
+            assert scale_factor_x == scale_factor_y
+            scale_factor = scale_factor_x
+            frame = cv2.resize(frame, None, fx=scale_x, fy=scale_y)
+        else:
+            if scale < 1:
+                frame = cv2.resize(frame, None, fx=scale, fy=scale)
+            scale_factor = scale
             vdim, hdim = frame.shape[:2]
         # Find the chess board corners
         ret, corners = cv2.findChessboardCorners(frame, checkerboard_size, None)
@@ -96,15 +106,14 @@ def find_checkerboard(
             # Draw and display the corners
             # frame = cv2.drawChessboardCorners(color_frame, (6, 8), corners, ret)
             # corners[:, 0] = corners[:, 0] * (1 / scale)
-            corners[:, 1] = corners[:, 1] * (1 / scale)
-            locations.append(corners)
+            # corners[:, 1] = corners[:, 1] * (1 / scale)
+            locations.append(corners * 1/scale_factor)
             marker_position = np.mean(corners, axis=0)
             mean_locations.append(marker_position)
-            corners[:, 0] = corners[:, 0] * (scale/hdim)
-            corners[:, 1] = corners[:, 1] * (scale/vdim)
-            norm_pos.append(corners)
-            marker_position = np.mean(corners, axis=0)
-            mean_norm_pos.append(marker_position)
+            corners_noramlized = corners / np.array([hdim, vdim])
+            norm_pos.append(corners_normalized)
+            marker_position_normalized = np.mean(corners_normalized, axis=0)
+            mean_norm_pos.append(marker_position_normalized)
 
     reference_dict = {}
     reference_dict['location'] = np.asarray(locations)
