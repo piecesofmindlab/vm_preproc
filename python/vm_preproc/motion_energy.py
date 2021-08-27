@@ -268,7 +268,7 @@ def show_motion_energy(features, params, ax=None, is_overlay=False,
         ax.add_collection(LC)
     # Add dots for sf=0
     if np.any(i0):
-        plt.scatter(xs[sf0_idx], (1-ys[sf0_idx]), color=cols[sf0_idx, :], s=mksz[i0])
+        plt.scatter(xs[i0], (1-ys[i0]), color=cols[i0, :], s=mksz[i0])
     # Final Setup
     plt.setp(ax, aspect='equal', xlim=(0, width), ylim=(0, height), xticks=(), yticks=())
     pdict = dict(color=bg_col, alpha=1) 
@@ -492,7 +492,7 @@ def make_motion_energy_animation_color(images, features, params, figsize=(5, 5),
     # initialization function: plot the background of each frame
     def init_func(fig, ax, artists):
         _ = show_motion_energy_color(np.zeros_like(features[0]), params, 
-            ax=ax, is_overlay=True, groups=artists[1:], *kwargs)
+            ax=ax, is_overlay=True, groups=artists[1:], **kwargs)
         im.set_array(np.zeros(im_shape))
         return artists 
     # animation function. This is called sequentially

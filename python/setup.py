@@ -34,7 +34,7 @@ setup(
     long_description=open('README.md').read(),
     url='https://github.com/piecesofmindlab/vm_preproc',
     download_url='https://github.com/piecesofmindlab/vm_preproc',
-    install_requires=requirements,
+    #install_requires=requirements,
     zip_safe=False,
     include_package_data = True,
     package_data={

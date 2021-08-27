@@ -471,6 +471,7 @@ def show_sdn(wts, params, mn_mx=None, lw=1, cmap=BCWORa, ax=None, show_axis=Fals
         mx = np.max(np.abs(wts)) * 0.8
         mn_mx = (-mx,mx)
     bin_centers = params['norm_bin_centers']
+    bin_centers = bin_centers / np.linalg.norm(bin_centers, axis=1, ord=2)[:, np.newaxis]
     nD = len(params['dist_bin_edges'])-1
     DstAdd = np.array([0,1,0]);
     

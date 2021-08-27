@@ -57,18 +57,27 @@ class AlexNetLayer(nn.Module):
         return x
 
 def get_layer(ims, layer=1, model_class=AlexNetLayer, image_transform=None, 
-    use_gpu=False, num_workers=3, **kwargs):
+    use_gpu=False, num_workers=3, flatten_output=False, shape=None, **kwargs):
     """Currently for pre-trained alexnet only
 
     retrieves activations of alexnet for specified layer
 
-    ims is a list of image file names"""
+    ims is a list of image file names
+	
+	shape is a dummy argument; does nothing"""
 
     # Get nn model
     model = model_class(layer, **kwargs)
     features = run_cnn(ims, model, image_transform=image_transform, 
                    use_gpu=use_gpu, num_workers=num_workers, **kwargs)
-    return features
+    params = dict(layer=layer, 
+                  shape=features.shape[1:], 
+                  image_transform=image_transform,
+                  flatten_output=flatten_output,
+                  )
+    if flatten_output:
+        features = features.reshape((features.shape[0], -1))
+    return features, params
 
 def run_cnn(ims, model, image_transform=None, 
     use_gpu=False, num_workers=3, data_loader=None, **kwargs):
