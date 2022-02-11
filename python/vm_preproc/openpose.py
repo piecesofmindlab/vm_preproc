@@ -243,7 +243,7 @@ def kpts_to_parts(keypoints_dir, image_shape, parts_dim=15, use_face_kpts=True, 
     return part_features
 
 
-def bvp_to_parts(session, parts_dim, basedir, downsampling='max_pooling'):
+def bvp_to_parts(session, parts_dim, basedir, downsampling='max_pooling', max_threshold=.5):
     part_features = []
     files = sorted(glob.glob(f'{basedir}/*x150x*{session}*'))
     for filename in files:
@@ -255,7 +255,7 @@ def bvp_to_parts(session, parts_dim, basedir, downsampling='max_pooling'):
             if downsampling == 'max_pooling':
                 for i in range(parts_dim):
                     for j in range(parts_dim):
-                        downsampled[:,i,j] = (splits[i][j].max(1).max(1) > 0).astype(int)
+                        downsampled[:,i,j] = (splits[i][j].max(1).max(1) > max_threshold).astype(int)
             else:
                 for i, part in enumerate(parts):
                     downsampled[i] = cv2.resize(part, (parts_dim, parts_dim), interpolation=cv2.INTER_AREA)
