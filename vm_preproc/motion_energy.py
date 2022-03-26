@@ -125,6 +125,9 @@ def pyramid_to_plot_params(**moten_pyramid_parameters):
     plot_params = {}
     for i, k in enumerate(plot_param_list):
         plot_params[k] = gparams[i]
+    if 'temporal_frequency' in plot_params:
+        factor = (moten_pyramid_parameters['stimulus_fps'] / moten_pyramid_parameters['gabor_temporal_window'])
+        plot_params['temporal_frequency'] = plot_params['temporal_frequency'] * factor
     if 'aspect_ratio' in moten_pyramid_parameters:
         plot_params['aspect_ratio'] = moten_pyramid_parameters['aspect_ratio']
     return plot_params
@@ -223,6 +226,7 @@ def show_motion_energy(features, params, ax=None, is_overlay=False,
     # Get indices to select specific temporal or spatial frequency Gabors
     if not tf_to_show is None:
         tf_idx = np.isclose(tfs, tf_to_show)
+        print(tf_idx.sum())
     else:
         tf_idx = np.ones(xs.shape) > 0
     sf_idx = sfs > 0
