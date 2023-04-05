@@ -430,6 +430,8 @@ def batch_run(fn, inpt,
                 stim = inpt.load(idx=idx, variable_name=kws['variable_name'], **load_kws)
             else:
                 stim = inpt.load(idx=idx, **load_kws)
+            if ('progress_bar' not in kws) and ('progress_bar' in kwargs):
+                _ = kwargs.pop('progress_bar')
             # Run function on this batch
             if isinstance(stim, dict):
                 out = fn(**stim, **kwargs)

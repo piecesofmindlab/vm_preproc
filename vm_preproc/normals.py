@@ -359,7 +359,7 @@ def compute_normal_gradient(normals, nonlinexp=1):
     x_grad = np.real(np.pad((dx1 + dx2) / 2, [(0, 0), (1, 1)], 'edge'))
     y_grad = np.real(np.pad((dy1 + dy2) / 2, [(1, 1), (0, 0)], 'edge'))
     # Compute magnitude and orientation of gradients
-    grad_mag = x_grad**2 + y_grad**2
+    grad_mag = np.sqrt(x_grad**2 + y_grad**2)
     grad_ori = np.arctan2(y_grad, x_grad)
 
     return grad_mag, grad_ori
