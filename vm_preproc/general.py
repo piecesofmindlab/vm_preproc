@@ -81,7 +81,8 @@ def normalize(S, method='zscore', crop=None, reduce_channels=None, valid_channel
     ----------
     S : stimulus / preprocessed stimulus. Better be 2D (time x channels)
     method : string, one of the following: 
-        'zscore' [default], 'gaussianize', 'uniform', '0to1', '-1to1' 
+        'zscore' [default], 'gaussianize', 'uniform', '0to1', '-1to1', 
+        'demean', 'demean_-1to1'
     reduce_channels : if scalar < 1, keep all channels with stds >
         params.reduce_channels * max std; if scalar > 1, keep n
         channels; if True, use following parameter as index to
@@ -128,6 +129,12 @@ def normalize(S, method='zscore', crop=None, reduce_channels=None, valid_channel
         spreproc /= Sr.max(axis=0)
     elif method == '-1to1':
         spreproc = S / np.abs(S).max(axis=0)
+    elif method == 'demean':
+        spreproc = S - np.nanmean(S, axis=0)
+    elif method == 'demean_-1to1':
+        spreproc = S - np.nanmean(S, axis=0)
+        spreproc /= np.abs(np.nanmax(S, axis=0))
+
 
     # Reduce the number of channels based on the standard deviation of channels, or
     # a pre-defined index (valid_channels) 
