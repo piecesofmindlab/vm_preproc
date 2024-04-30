@@ -224,7 +224,7 @@ class DataSet(object):
         if self._n_frames is None:
             if self._data is None:
                 fnm, ext = os.path.splitext(self.fpath)
-                sz = file_io.var_size(self.fpath, variable_name=self.variable_name)
+                sz = file_io.list_array_shapes(self.fpath, variable_name=self.variable_name)
                 frames = sz[0]
             else:
                 # Assume (y, x, [c], t) array
@@ -269,7 +269,7 @@ class MultiPartDataSet(object):
     def n_frames(self):
         if self._n_frames is None:
             if self._data is None:
-                frames = dict((k, file_io.var_size(self.fpaths[k], variable_name=self.variable_names[k])[0]) for k in self.fpaths.keys())
+                frames = dict((k, file_io.list_array_shapes(self.fpaths[k], variable_name=self.variable_names[k])[0]) for k in self.fpaths.keys())
             else:
                 frames = dict((k, v.shape[0]) for k, v in self._data.items())
             self._n_frames = frames
