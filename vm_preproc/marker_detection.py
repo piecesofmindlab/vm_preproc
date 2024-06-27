@@ -48,7 +48,7 @@ def find_checkerboard(
 
     # termination criteria: Make inputs?
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    n_frames_total, vdim, hdim, _ = file_io.var_size(video_file)
+    n_frames_total, vdim, hdim, _ = file_io.list_array_shapes(video_file)
     if start_frame is None:
         start_frame = 0
     if end_frame is None:

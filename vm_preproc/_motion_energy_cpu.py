@@ -18,7 +18,7 @@ import numpy as np
 # Helper functions
 ##############################
 
-def imagearr2luminance(uint8arr, size=(96,96), filter=Image.ANTIALIAS):
+def imagearr2luminance(uint8arr, size=(96,96), filter=Image.Resampling.LANCZOS):
 	'''Convert an array of uint8 RGB images to a luminance image
 
 	Parameters
@@ -48,7 +48,7 @@ def imagearr2luminance(uint8arr, size=(96,96), filter=Image.ANTIALIAS):
 	return np.asarray(luminance)
 
 
-def resize_image(im, size=(96,96), filter=Image.ANTIALIAS):
+def resize_image(im, size=(96,96), filter=Image.Resampling.LANCZOS):
 	'''Resize an image and return its array representation
 
 	Parameters
