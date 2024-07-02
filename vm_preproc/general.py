@@ -1,6 +1,4 @@
 # General preprocessing steps
-from __future__ import division
-
 import numpy as np
 from .utils import make_uniform, norm_std_mean
 

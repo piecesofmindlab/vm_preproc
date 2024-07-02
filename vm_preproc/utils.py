@@ -1,6 +1,5 @@
 # Utility functions
 import os
-import six
 import h5py
 import tqdm
 import time
@@ -334,7 +333,7 @@ def batch_run(fn, inpt,
     
     ## Handle inputs
     # Get function to call
-    if isinstance(fn, six.string_types):
+    if isinstance(fn, str):
         fn = get_function(fn)
     # Manage input type, map to DataSet or MultiPartDataSet class if necessary
     if not hasattr(inpt, 'load'):
@@ -343,7 +342,7 @@ def batch_run(fn, inpt,
             inpt = MultiPartDataSet(**inpt)
         else:
             # Deal with single input
-            if isinstance(inpt, six.string_types):
+            if isinstance(inpt, str):
                 inpt = DataSet(inpt)
             else:
                 inpt = DataSet(None, data=inpt)

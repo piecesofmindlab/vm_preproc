@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import file_io as fio
 from matplotlib import cm, colors, animation
 from matplotlib.collections import LineCollection
-import six
 
 # Custom color maps
 from matplotlib.colors import LinearSegmentedColormap
@@ -593,11 +592,6 @@ def plot_moten_values(feature_values, params, vmin=None, vmax=None, cmap=None,
 
 
     '''
-    #import six
-    #import matplotlib.pyplot as plt
-    #from matplotlib import cm, colors, animation
-    #from matplotlib.collections import LineCollection
-
     # Handle inputs
     gmax = np.max(np.abs(feature_values))
     update = groups is not None
@@ -610,7 +604,7 @@ def plot_moten_values(feature_values, params, vmin=None, vmax=None, cmap=None,
     # Set colors of displayed lines
     cnorm = colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
     gnorm = cnorm(feature_values)
-    if isinstance(cmap, six.string_types):
+    if isinstance(cmap, str):
         cmap = cm.get_cmap(cmap)
     # cols = cnorm(gnorm)
     # Simpler parameters
