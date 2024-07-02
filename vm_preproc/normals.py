@@ -407,11 +407,11 @@ def norm_color_image(nimg, cmap=RET, vmin_t=0, vmax_t=2 * np.pi,
     tilt_hsv[:,:,1] = norm_s(slant)
     # Convert back to RGB
     tilt_rgb = skcol.hsv2rgb(tilt_hsv)
-    tilt_rgb = np.dstack([tilt_rgb, 1-np.isnan(slant).astype(np.float)])
+    tilt_rgb = np.dstack([tilt_rgb, 1-np.isnan(slant).astype(float)])
     # Compute better alpha
     a_im = np.dstack([tilt_rgb_orig[...,:3], norm_s(slant)])
     aa_im = tilt_rgb_orig[...,:3] * norm_s(slant)[..., np.newaxis] + np.ones_like(tilt_rgb_orig[...,:3]) * 0.5 * (1-norm_s(slant)[...,np.newaxis])
-    aa_im = np.dstack([aa_im, 1-np.isnan(tilt).astype(np.float)])
+    aa_im = np.dstack([aa_im, 1-np.isnan(tilt).astype(float)])
     
     return aa_im
 

@@ -94,7 +94,7 @@ def ensure_monotonic(x):
 
     (adds a small delta to identical values to make them slightly different)
     """
-    x = x.astype(np.float64)
+    x = x.astype(float64)
     for ii in range(1, x.size):
         if x[ii] <= x[ii-1]:
             if np.abs(x[ii-1]) > 1e-14:
@@ -137,10 +137,10 @@ def alpha_overlay(im0, im1, alpha, center=(0,0)):
         alpha = np.atleast_3d(alpha)
     if (x1 != x0) or (y1 != y0):
         # By convention, add any rounded pixels to left and top
-        left = np.ceil((x0 - x1) / 2 + center[0]).astype(np.int)
-        right = np.floor((x0 - x1) / 2 - center[0]).astype(np.int)
-        top = np.ceil((y0 - y1) / 2 - center[1]).astype(np.int)
-        bottom = np.floor((y0 - y1) / 2 + center[1]).astype(np.int)
+        left = np.ceil((x0 - x1) / 2 + center[0]).astype(int)
+        right = np.floor((x0 - x1) / 2 - center[0]).astype(int)
+        top = np.ceil((y0 - y1) / 2 - center[1]).astype(int)
+        bottom = np.floor((y0 - y1) / 2 + center[1]).astype(int)
         # Will generate errors with overflow; fix? just let it generate errors for now.
         if np.ndim(im1) == 2:
             im1 = np.pad(im1, [(top, bottom), (left, right)])

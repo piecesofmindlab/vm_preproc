@@ -152,7 +152,7 @@ def compute_filter_responses(stimulus,
         gabor = mk_3d_gabor((hdim,vdim,gabor_temporal_window),
                             *gabor_param,
                             aspect_ratio=aspect_ratio)
-        gabor = map(np.float32, gabor)
+        gabor = [x.astype(np.float32) for x in gabor]
         gabor0, gabor90, tgabor0, tgabor90 = map(torch.from_numpy, gabor)
         if use_cuda:
             gabor0, gabor90, tgabor0, tgabor90 = (gabor0.cuda(),

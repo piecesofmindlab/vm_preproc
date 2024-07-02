@@ -108,9 +108,9 @@ def compute_gradient(S, dimensions=(1, 2), return_type='magnitude', threshold=No
     """
     # This is horrible but there's no good way to do this sort of check in numpy;
     # see https://github.com/numpy/numpy/issues/17325
-    if not np.issubdtype(S.dtype, np.float):
+    if not np.issubdtype(S.dtype, float):
         print('converting to float')
-        S = S.astype(np.float)
+        S = S.astype(float)
     # Compute gradients
     gx, gy = np.gradient(S, axis=dimensions)
     if return_type == 'magnitude':
@@ -118,5 +118,5 @@ def compute_gradient(S, dimensions=(1, 2), return_type='magnitude', threshold=No
     elif return_type == 'orientation':
         out = np.arctan2(gx, gy)
     if threshold is not None:
-        out = (out > threshold).astype(np.float)
+        out = (out > threshold).astype(float)
     return out

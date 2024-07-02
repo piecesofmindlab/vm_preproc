@@ -262,7 +262,7 @@ def show_gist(gist_vec, n_oris=8, n_scales=4, n_loc=4, im=None, vmin=None, vmax=
     """Show gist features for a given gist vector
     
     Parameters"""
-    n_lines_per_scale = np.round(np.linspace(11, 1, n_scales)).astype(np.int) # [11, 7, 3, 1]
+    n_lines_per_scale = np.round(np.linspace(11, 1, n_scales)).astype(int) # [11, 7, 3, 1]
     lw_per_scale = np.linspace(0.3, 10.0, n_scales)
     delta = (1. / n_loc) /2.
     dd = delta / np.sqrt(2)
