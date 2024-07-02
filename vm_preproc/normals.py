@@ -8,16 +8,18 @@ from matplotlib import transforms as mtransforms
 from matplotlib.patches import FancyBboxPatch
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-
+import tqdm
 from skimage import color as skcol
-try:
-    import cv2 as cv
-except:
-    print("cv2 import failed; attempting to import cv3!")
-    import cv3 as cv
+import cv2
+
 from . import utils 
 
-import tqdm
+try:
+    import torch
+    torch_available=True
+except:
+    torch_available=False
+
 
 # Colormap(s)
 from matplotlib.colors import LinearSegmentedColormap
@@ -532,4 +534,24 @@ def show_sdn(wts, params, mn_mx=None, lw=1, cmap=BCWORa, ax=None, show_axis=Fals
     if cbar:
         fig.colorbar(polys, ax=ax)
 
-        
+if torch_available:
+    #
+    normal_predictor = torch.hub.load("hugoycj/DSINE-hub", "DSINE", trust_repo=True)
+    def process_normals_dsine(frames, progress_bar=None):
+        """Estimate surface normals from image as in Bae & Davidson, CVPR 2024 (DSINE)"""
+        # Code can be made flexible to this, not doing it for now
+        assert torch.cuda.is_available(), 'Must run on GPU for now'
+        if progres_bar is None:
+            progress_bar = lambda x: x 
+        # Load the input image using OpenCV
+        h, w = frames.shape[1:3]
+        # Use the model to infer the normal map from the input image
+        with torch.inference_mode():
+            normals_out = []
+            for frame in progress_bar(range(len(frames))):
+                image_bgr = cv2.cvtColor(frames[frame], cv2.COLOR_BGR2RGB)
+                normal_raw = normal_predictor.infer_cv2(image_bgr)[0]  # Output shape: (H, W, 3)
+                normal = normal_raw.cpu().numpy().transpose(1, 2, 0)
+                normals_out.append(normal[:,:,[0, 2, 1]])
+
+        return np.asarray(normals_out)
