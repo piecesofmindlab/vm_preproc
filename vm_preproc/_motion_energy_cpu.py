@@ -41,10 +41,10 @@ def imagearr2luminance(uint8arr, size=(96,96), filter=Image.Resampling.LANCZOS):
 
 	luminance = []
 	for imdx in xrange(uint8arr.shape[-1]):
-		 im = misc.toimage(uint8arr[...,imdx])
-		 im = resize_image(im, size=size, filter=filter)
-		 im = rgb2lab(im/255.)[...,0]
-		 luminance.append(im)
+		im = misc.toimage(uint8arr[...,imdx])
+		im = resize_image(im, size=size, filter=filter)
+		im = rgb2lab(im/255.)[...,0]
+		luminance.append(im)
 	return np.asarray(luminance)
 
 
@@ -65,7 +65,7 @@ def resize_image(im, size=(96,96), filter=Image.Resampling.LANCZOS):
 	'''
 
 	if isinstance(im, str):
-		 im = Image.open(im)
+		im = Image.open(im)
 	im.load()
 	im = im._new(im.im.stretch(size, filter))
 	im = np.asarray(im)
@@ -101,7 +101,7 @@ def load_image_luminance(image_files, hdim=None, vdim=None, verbose=False):
 	for fdx, fl in enumerate(image_files):
 		if verbose:
 			if fdx % 500 == 1: 
-				 print(fdx)
+				print(fdx)
 		stimulus = Image.open(fl)
 		stimulus = loader(stimulus,(hdim,vdim))
 		stimulus = rgb2lab(stimulus/255.)[...,0]
@@ -340,11 +340,11 @@ def mk_moten_pyramid_params(stimulus_fps,
 	"""
 
 	def compute_envelope(freq, ratio):
-		 return np.inf if freq == 0 else (1.0/freq)*ratio
+		return np.inf if freq == 0 else (1.0/freq)*ratio
 
-	spatial_frequencies = np.asarray(spatial_frequencies).astype(np.float)
-	spatial_directions = np.asarray(spatial_directions).astype(np.float)
-	temporal_frequencies = np.asarray(temporal_frequencies).astype(np.float)
+	spatial_frequencies = np.asarray(spatial_frequencies).astype(float)
+	spatial_directions = np.asarray(spatial_directions).astype(float)
+	temporal_frequencies = np.asarray(temporal_frequencies).astype(float)
 	include_edges = int(include_edges)
 
 	# normalize temporal frequency to wavelet size
@@ -384,24 +384,24 @@ def mk_moten_pyramid_params(stimulus_fps,
 					continue
 
 				gabor_parameters.append([cx,
-												 cy,
-												 spatial_direction,
-												 spatial_freq,
-												 spatial_env,
-												 temp_freq,
-												 temp_env,
-												 ])
+										cy,
+										spatial_direction,
+										spatial_freq,
+										spatial_env,
+										temp_freq,
+										temp_env,
+										])
 
 				if spatial_direction == 0 and include_local_dc:
-					 # add local 0 spatial frequency non-directional temporal filter
-					 gabor_parameters.append([cx,
-													  cy,
-													  spatial_direction,
-													  0., # zero spatial freq
-													  spatial_env,
-													  temp_freq,
-													  temp_env,
-													  ])
+					# add local 0 spatial frequency non-directional temporal filter
+					gabor_parameters.append([cx,
+											cy,
+											spatial_direction,
+											0., # zero spatial freq
+											spatial_env,
+											temp_freq,
+											temp_env,
+											])
 
 	gabor_parameters = np.asarray(gabor_parameters)
 	return gabor_parameters
@@ -471,7 +471,7 @@ def mk_3d_gabor(xyt,
 	Same method as Nishimoto, et al., 2011.
 	'''
 
-	szx, szy, szt = np.asarray(xyt).astype(np.int)
+	szx, szy, szt = np.asarray(xyt).astype(int)
 
 	dx = np.linspace(0,aspect_ratio,szx, endpoint=True)
 	dy = np.linspace(0,1,szy, endpoint=True)
