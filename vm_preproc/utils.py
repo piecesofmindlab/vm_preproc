@@ -223,7 +223,7 @@ class DataSet(object):
         if self._n_frames is None:
             if self._data is None:
                 fnm, ext = os.path.splitext(self.fpath)
-                sz = file_io.list_array_shapes(self.fpath, variable_name=self.variable_name)
+                sz = file_io.var_size(self.fpath, variable_name=self.variable_name)
                 frames = sz[0]
             else:
                 # Assume (y, x, [c], t) array
