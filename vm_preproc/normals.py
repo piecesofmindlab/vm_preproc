@@ -8,7 +8,9 @@ from matplotlib import transforms as mtransforms
 from matplotlib.patches import FancyBboxPatch
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import pathlib
 import tqdm
+import sys
 from skimage import color as skcol
 import cv2
 
@@ -75,6 +77,7 @@ BCWORaa = LinearSegmentedColormap.from_list('BCWORaa',List)
 
 def compute_distance_orientation_bins(normals,
                                       distance,
+                                      sky_mask=None,
                                       camera_vector=None,
                                       norm_bin_centers=NORM_BIN_CENTERS,
                                       dist_bin_edges=DIST_BIN_EDGES,
@@ -99,6 +102,17 @@ def compute_distance_orientation_bins(normals,
         4D array of surface normal images (x, y, xyz_normal, frames)
     distance: array
         3D array of distance images (x, y, frames)
+    sky_mask: array
+        optional, array of pixels for each image that constitute the sky. If 
+        not present, sky will be inferred from depth maps (where depth is > 100
+        units). However, if depth is computed from pixels via some algorithm,
+        depth in skies is often not accurate, but labeling of sky pixels via
+        image segmentation algorithms often is. Thus, a sky mask (generated
+        however) can be provided to help.
+    camera_vector : array
+        vector of camera facing direction; for removing rotation of camera
+        from direction of normals (e.g. to compute normals with respect to 
+        gravity), necessary if `remove_camera_rotation=True`)
     norm_bin_centers: array
         array of basis vectors that specify the CENTERS (not edges) of bins for
         surface orientation
@@ -117,6 +131,9 @@ def compute_distance_orientation_bins(normals,
     """
     # Cleanup of some distance files
     distance[np.isnan(distance)] = 1000
+    # Mask out skies in distance images based on sky_mask, if available
+    if sky_mask is not None:
+        distance[sky_mask] = 1000
 
     bins_x = np.linspace(0, 1, n_bins_x+1)
     bins_x[-1] = np.inf
@@ -166,11 +183,6 @@ def compute_distance_orientation_bins(normals,
 
     output = np.zeros((n_ims, n_dims)) * np.nan
     for iS in progress_bar(range(n_ims)):
-        #if n_ims>200:
-        #    if iS % 200 == 0:
-        #        print("Done to image %d / %d"%(iS, n_ims)) #progressdot(iS,200,2000,n_ims)
-        #elif (n_ims < 200) and (n_ims > 1):
-        #    print('computing Scene Depth Normals...')
         # Pull single image for preprocessing
         z = distance[iS]
         n = normals[iS]
@@ -221,7 +233,7 @@ def compute_distance_orientation_bins(normals,
                     # Illegal for more than two bins of normals within the same
                     # depth / horiz/vert tile to be == 1
                     if sum(tmp_out == 1) > 1:
-                        error('Found two separate normal bins equal to 1 - that should be impossible!')
+                        raise Exception('Found two separate normal bins equal to 1 - that should be impossible!')
                     if dist_normalize and not (n_norm_bins == 1):
                         # normalize normals by n pixels at this depth/screen tile
                         tmp_out = tmp_out * pct_pix_this_depth
@@ -300,7 +312,7 @@ def vector_to_camera_matrix(c_vec, ignore_rot_xyz=(False, True, False)):
       [roll] of cameras anyway!)
 
     """
-    xr, yr, zr = (~np.array(ignore_rot_xyz)).astype(np.bool)
+    xr, yr, zr = (~np.array(ignore_rot_xyz)).astype(bool)
     # Vector to Euler angles:
     if xr:
         xr = np.arctan2(c_vec[2], (c_vec[0]**2 + c_vec[1]**2)**0.5)
@@ -535,10 +547,14 @@ def show_sdn(wts, params, mn_mx=None, lw=1, cmap=BCWORa, ax=None, show_axis=Fals
         fig.colorbar(polys, ax=ax)
 
 if torch_available:
-    #
-    normal_predictor = torch.hub.load("hugoycj/DSINE-hub", "DSINE", trust_repo=True)
+    # DSINE surface normal computation:        
     def process_normals_dsine(frames, progress_bar=None):
         """Estimate surface normals from image as in Bae & Davidson, CVPR 2024 (DSINE)"""
+        try:
+            normal_predictor = torch.hub.load("hugoycj/DSINE-hub", "DSINE", trust_repo=True)
+        except:
+            print("You have pytorch but you need to install geffnet to predict surface normals with DSINE:\npip install geffnet")
+            raise
         # Code can be made flexible to this, not doing it for now
         assert torch.cuda.is_available(), 'Must run on GPU for now'
         if progress_bar is None:
@@ -555,3 +571,72 @@ if torch_available:
                 normals_out.append(normal[:,:,[0, 2, 1]])
 
         return np.asarray(normals_out)
+    
+    # Depth-Anything-V2 distance
+
+    model_configs = {
+        'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
+        'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
+        'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]}
+    }
+
+    def process_depth_anything_v2_metric(data,
+                                        model_size='large',
+                                        dataset='vkitti',
+                                        max_distance=80,
+                                        torch_device='cuda',
+                                        device_ids=None,
+                                        code_path='~/Code/Depth-Anything-V2/metric_depth/',
+                                        progress_bar=None,
+        ):
+        """
+        ASSUMES you have downloaded DepthAnythingV2 from github (https://github.com/DepthAnything/Depth-Anything-V2)
+
+        Parameters
+        ----------
+        model_size : str
+            'large','small', or 'base'
+        dataset : str
+            Dataset on which model was trained, 'vkitti' for outdoor scenes (up to 80 units away), 
+            'hypersim' for indoor scenes up to 20 units away.
+        max_distance : scalar 
+            Max distance to be estimated
+        torch_device : str
+            which device to use, 'cpu' or 'cuda' currently work, aiming to be able to specify a particular GPU core, 
+            but that is still WIP
+        device_ids : list 
+            of GPUs on which it's allowable to run. NOT WORKING. Do not change from None.
+        code_path : str
+            where DepthAnythingV2 lives. This dir is added to path and code is run from there. 
+            Yes this is somewhat sketchy.
+        progress_bar : tqdm-like progress bar
+            progress bar function
+
+        """
+        # This is janky: Just put depth-anything onto path
+        code_dir = pathlib.Path(code_path).expanduser()
+        if not code_dir.exists():
+            ss = "Please clone https://github.com/DepthAnything/Depth-Anything-V2 to \n~/Code/Depth-Anything-V2 or specify the correct path to your cloned copy of DepthAnythingV2 in `code-path`"
+            raise ImportError(ss)
+        if not str(code_dir) in sys.path:
+            sys.path.append(str(code_dir))
+        print(code_dir)
+        print(sys.path)
+        from depth_anything_v2.dpt import DepthAnythingV2
+        if progress_bar is None:
+            progress_bar = lambda x: x
+        device = torch.device(torch_device)
+        encoder = f'vit{model_size[0].lower()}' 
+        model = DepthAnythingV2(**{**model_configs[encoder], 'max_depth': max_distance})
+        model.load_state_dict(torch.load(str(code_dir / f'checkpoints/depth_anything_v2_metric_{dataset}_{encoder}.pth'), map_location=torch_device))
+        if device_ids is not None:
+            model = nn.DataParallel(model,device_ids = device_ids)
+        model.to(device)
+        model.eval()
+        out = []
+        for j in progress_bar(range(len(data))):
+            frame = data[j]
+            raw_img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            tmp = model.infer_image(raw_img) # HxW depth map in meters in numpy
+            out.append(tmp)
+        return np.asarray(out)
