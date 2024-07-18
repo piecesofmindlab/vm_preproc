@@ -541,7 +541,7 @@ if torch_available:
         """Estimate surface normals from image as in Bae & Davidson, CVPR 2024 (DSINE)"""
         # Code can be made flexible to this, not doing it for now
         assert torch.cuda.is_available(), 'Must run on GPU for now'
-        if progres_bar is None:
+        if progress_bar is None:
             progress_bar = lambda x: x 
         # Load the input image using OpenCV
         h, w = frames.shape[1:3]

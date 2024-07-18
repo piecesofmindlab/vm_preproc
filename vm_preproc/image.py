@@ -73,14 +73,19 @@ def spatial_downsample(S,
         if 'block_size' in kwargs:
             kwargs['block_size'] = tuple(kwargs['block_size'])
         out = block_reduce(S, func=func, **kwargs)
-        if flatten:
-            dim = np.prod(out.shape[1:])
-            out = out.reshape(-1, dim)
     elif method == 'opencv':
-        raise NotImplementedError('Not yet!')
+        out = []
+        for frame in S:
+            tmp = cv2.resize(frame, **kwargs)
+            out.append(tmp)
+        out = np.asarray(out)
+        #raise NotImplementedError('Not yet!')
         #out = np.asarray([cv2.resize()])
     else:
         raise ValueError('Unknown method "%s"' % method)
+    if flatten:
+        dim = np.prod(out.shape[1:])
+        out = out.reshape(-1, dim)
     return out
 
 def compute_gradient(S, dimensions=(1, 2), return_type='magnitude', threshold=None):
