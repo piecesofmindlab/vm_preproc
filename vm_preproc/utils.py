@@ -11,7 +11,7 @@ from scipy.interpolate import interp1d
 from functools import reduce
 
 ### --- Stats functions --- ###
-def norm_std_mean(S, mean=None, std=None, size_thresh=None):
+def norm_std_mean(S, mean=None, std=None, size_thresh=None, axis=0):
     """Z-scoring, with allowances for huge matrices*
 
     Also allows normalization based on pre-computed means/stds, which is 
@@ -21,19 +21,21 @@ def norm_std_mean(S, mean=None, std=None, size_thresh=None):
 
     Parameters
     ----------
-    S : array
-    	to be z-scored along first (0th) dimension
-    mean : array
-		array to subtract off of S; must be same shape as S besides first 
-		dimension.
-	std : array
-		standard deviation by which to divide S; must be same shape as S 
-		besides first dimension.
+     S : array
+        to be z-scored along the specified axis
+    mean : array, optional
+        array to subtract from S; must be the same shape as S, except along 
+        the specified axis.
+    std : array, optional
+        standard deviation by which to divide S; must be the same shape as S, 
+        except along the specified axis.
+    axis : int, optional
+        axis along which to compute the mean and std. Default is 0 (columns).
     """
     if mean is None:
-        mean = S.mean(0)
+        mean = S.mean(axis=axis, keepdims=True)
     if std is None:
-        std = S.std(0)
+        std = S.std(axis=axis, keepdims=True)
     # Disallow zero-division
     std[std==0] = 1
     # Add optimization for huge matrices here
