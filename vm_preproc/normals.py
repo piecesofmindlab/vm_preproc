@@ -273,8 +273,13 @@ def remove_rotation(N, V, angle_to_remove=(True, False, False), do_normalize=Tru
 
     Parameters
     ----------
+    N : array
+        normal image, stacked in first dimension, [images, x, y, normals]
+    V : array
+        vectors to subtract off of normals [images,3]
     angle_to_remove: tuple or list
-        list of boolean values indicating whether to remove [x, y, z] rotations
+        list of boolean values indicating whether to remove [x, y, z] 
+        rotations. e.g. to remove Y rotation only, [False, True, False]
     do_normalize: bool
         whether to re-normalize angles after rotation is removed.
     """
@@ -307,9 +312,14 @@ def vector_to_camera_matrix(c_vec, ignore_rot_xyz=(False, True, False)):
     "true" untouched (i.e., in their original image space).
 
     Deals with ONE VECTOR AT A TIME
-
-    IgnoreRot = [false,true,false] by default (there should be no y rotation
-      [roll] of cameras anyway!)
+    Parameters
+    ----------
+    c_vec : array
+        3-long aray for vector from camera to fixation (computed as fixxation
+        location minus camera location)
+    ignore_rot_xyz : array-like
+        3 boolean values for which dimensions to modify, [False,True,False] by 
+        default (there should be no y rotation [roll] of cameras anyway!)
 
     """
     xr, yr, zr = (~np.array(ignore_rot_xyz)).astype(bool)
@@ -351,8 +361,8 @@ def compute_normal_gradient(normals, nonlinexp=1):
 
     Parameters
     ----------
-    normals : 
-
+    normals : array
+        array of normals
     nonlinexp : scalar
         Raise whole image to this power (to adjust contrast)
     """
@@ -374,7 +384,7 @@ def compute_normal_gradient(normals, nonlinexp=1):
     y_grad = np.real(np.pad((dy1 + dy2) / 2, [(1, 1), (0, 0)], 'edge'))
     # Compute magnitude and orientation of gradients
     grad_mag = np.sqrt(x_grad**2 + y_grad**2)
-    grad_ori = np.arctan2(y_grad, x_grad)
+    grad_ori = np.arctan2(y_grad, x_grad) ** nonlinexp
 
     return grad_mag, grad_ori
 
@@ -384,9 +394,11 @@ def tilt_slant(img, make_1d=False):
 
     Parameters
     ----------
-    nimg: array
+    img: array
         Pixelwise normal image, [x,y,3] - 3rd dimension should represent 
         the surface normal (x,y,z vector, summing to 1) at each pixel
+    make_1d : bool
+        whether to flatten the output arrays to one dimension each
     """
     sky = np.all(img==0, axis=2)
     # Tilt
@@ -405,9 +417,22 @@ def tilt_slant(img, make_1d=False):
         return tau, sig
 
 
-def norm_color_image(nimg, cmap=RET, vmin_t=0, vmax_t=2 * np.pi,
-                    vmin_s=0, vmax_s=np.pi/2):
-    """Convert normal image to colormapped normal image"""
+def norm_color_image(nimg,
+                     cmap=RET,
+                     vmin_t=0,
+                     vmax_t=2 * np.pi,
+                     vmin_s=0,
+                     vmax_s=np.pi/2):
+    """Convert normal image to colormapped normal image
+
+    Parameters
+    ----------
+    nimg : array
+        normal image, [vert, horiz, normals]
+    cmap : matplotlib colormap
+        colormap for display of normals
+    
+    """
     from matplotlib.colors import Normalize
     tilt, slant = tilt_slant(nimg, make_1d=False)
     # Normalize tilt (-pi to pi) -> (0, 1)
@@ -430,8 +455,16 @@ def norm_color_image(nimg, cmap=RET, vmin_t=0, vmax_t=2 * np.pi,
     return aa_im
 
 
-def tilt_slant_hist(tilt, slant, n_slant_bins = 30, n_tilt_bins = 90, do_log=True, 
-                    vmin=None, vmax=None, H=None, ax=None, **kwargs):
+def tilt_slant_hist(tilt, 
+                    slant,
+                    n_slant_bins=30,
+                    n_tilt_bins=90,
+                    do_log=True,
+                    vmin=None,
+                    vmax=None,
+                    H=None,
+                    ax=None,
+                    **kwargs):
     """Plot a polar histogram of tilt and slant values
     
     if H is None, computes & plots histogram of tilt & slant
@@ -472,8 +505,17 @@ def tilt_slant_hist(tilt, slant, n_slant_bins = 30, n_tilt_bins = 90, do_log=Tru
         plt.colorbar(pc)
 
 
-def show_sdn(wts, params, mn_mx=None, lw=1, cmap=BCWORa, ax=None, show_axis=False, 
-             azim=-80, elev=10, dst_spacing=3, pane_scale=1, cbar=False):
+def show_sdn(wts, params,
+             mn_mx=None,
+             lw=1,
+             cmap=BCWORa,
+             ax=None,
+             show_axis=False,
+             azim=-80,
+             elev=10,
+             dst_spacing=3,
+             pane_scale=1,
+             cbar=False):
     """Show scene depth/normal model channels
     """
     # forget tiled models for now - they don't work anyway.
@@ -589,8 +631,10 @@ if torch_available:
                                         code_path='~/Code/Depth-Anything-V2/metric_depth/',
                                         progress_bar=None,
         ):
-        """
-        ASSUMES you have downloaded DepthAnythingV2 from github (https://github.com/DepthAnything/Depth-Anything-V2)
+        """Process stack of images to estimate depth
+        
+        Requires that you have downloaded DepthAnythingV2 from github
+        (https://github.com/DepthAnything/Depth-Anything-V2)
 
         Parameters
         ----------
@@ -602,16 +646,16 @@ if torch_available:
         max_distance : scalar 
             Max distance to be estimated
         torch_device : str
-            which device to use, 'cpu' or 'cuda' currently work, aiming to be able to specify a particular GPU core, 
-            but that is still WIP
+            which device to use, 'cpu' or 'cuda' currently work, aiming to be 
+            able to specify a particular GPU core, but that is still WIP
         device_ids : list 
-            of GPUs on which it's allowable to run. NOT WORKING. Do not change from None.
+            of GPUs on which it's allowable to run. NOT WORKING. Do not change 
+            from None.
         code_path : str
-            where DepthAnythingV2 lives. This dir is added to path and code is run from there. 
-            Yes this is somewhat sketchy.
+            where DepthAnythingV2 lives. This dir is added to path and code is 
+            run from there. Yes this is somewhat sketchy.
         progress_bar : tqdm-like progress bar
             progress bar function
-
         """
         # This is janky: Just put depth-anything onto path
         code_dir = pathlib.Path(code_path).expanduser()
@@ -620,8 +664,6 @@ if torch_available:
             raise ImportError(ss)
         if not str(code_dir) in sys.path:
             sys.path.append(str(code_dir))
-        print(code_dir)
-        print(sys.path)
         from depth_anything_v2.dpt import DepthAnythingV2
         if progress_bar is None:
             progress_bar = lambda x: x
