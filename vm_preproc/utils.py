@@ -34,6 +34,8 @@ def norm_std_mean(S, mean=None, std=None, size_thresh=None):
         mean = S.mean(0)
     if std is None:
         std = S.std(0)
+    # Disallow zero-division
+    std[std==0] = 1
     # Add optimization for huge matrices here
     return (S - mean) / std, mean, std
 
