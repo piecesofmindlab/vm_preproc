@@ -1,15 +1,17 @@
-
+"""Text to mask code, depends on Grounded SAM version 2: 
+https://github.com/IDEA-Research/Grounded-SAM-2?tab=readme-ov-file#grounded-sam-2-florence-2-image-demo-updating
+"""
 import time
 from PIL import Image
 import numpy as np
 try:
     import pathlib
     # Relaxing hard-coded location would be better.
-    CODE_DIR = pathlib.Path('~/Code/Grounded-SAM-2')
+    CODE_DIR = pathlib.Path('~/Code/Grounded-SAM-2').expanduser()
     if not CODE_DIR.exists():
         raise ImportError('No Grounded-SAM-2.')
     import sys
-    sys.path.append(CODE_DIR / 'grounding_dino')
+    sys.path.append(str(CODE_DIR ))
     # Soft dependencies 
     import torch
     import supervision as sv
@@ -18,10 +20,15 @@ try:
     from sam2.build_sam import build_sam2
     from sam2.sam2_image_predictor import SAM2ImagePredictor
     # Grounding Dino
-    from groundingdino.util.inference import load_model, predict
-    from groundingdino.datasets import transforms as T
+    from grounding_dino.groundingdino.util.inference import load_model, predict
+    from grounding_dino.groundingdino.datasets import transforms as T
 except:
-    pass
+    print("Some imports failed.")
+    raise
+# Silence extremely verbose output by default
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.ERROR)
 
 def _process_image(image, scale_to=425, max_size=425):
     """Process inputs by scaling, normalizing, and converting to tensor
@@ -47,13 +54,16 @@ def text_to_mask(images,
               text_extra_categories='',
               combine_instances=True,
               fixed_size=True,
-              sam2_checkpoint="checkpoints/sam2_hiera_large.pt",
-              model_cfg = "sam2_hiera_l.yaml",
+              sam2_checkpoint=str(CODE_DIR / "checkpoints/sam2_hiera_large.pt"),
+              sam2_config_path = "sam2_hiera_l.yaml",
               # Renameme: this is grounding dino checkpoint
-              gdino_checkpoint_path="gdino_checkpoints/groundingdino_swint_ogc.pth",
-              gdino_config_path="grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py",
+              gdino_checkpoint_path=str(CODE_DIR / "gdino_checkpoints/groundingdino_swint_ogc.pth"),
+              gdino_config_path=str(CODE_DIR / "grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py"),
               #model_id = "IDEA-Research/grounding-dino-tiny",
+              progress_bar=None,
              ):
+    if progress_bar is None:
+        progress_bar = lambda x: x
     # Outputs
     masks_out = []
     scores_out = []
@@ -68,11 +78,12 @@ def text_to_mask(images,
         device=device
     )
     # Build SAM model
-    sam2_model = build_sam2(model_cfg, sam2_checkpoint, device="cuda")
+    sam2_model = build_sam2(sam2_config_path, sam2_checkpoint, device="cuda")
     # Make IMAGE mask generator based on that model
     sam2_predictor = SAM2ImagePredictor(sam2_model)
-    
-    for image_input in images:
+    n_images = images.shape[0]
+    for fr in progress_bar(range(n_images)):
+        image_input = images[fr]
         image_source, image = _process_image(image_input)
        
         # Grounding dino model
@@ -104,7 +115,7 @@ def text_to_mask(images,
             # Feed image to image mask generator
             sam2_predictor.set_image(image_source)
             t1i = time.time()
-            print(f'Image processed in {t1b-t0b:.2f}, {t1i-t0i:.2f} seconds')
+            #print(f'Image processed in {t1b-t0b:.2f}, {t1i-t0i:.2f} seconds')
 
             # FIXME: figure how does this influence the G-DINO model
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
@@ -130,6 +141,6 @@ def text_to_mask(images,
             masks_out.append(None)
             scores_out.append(None)
             logits_out.append(None)
-
+            labels_out.append(None)
     
     return masks_out, scores_out, logits_out, labels_out
