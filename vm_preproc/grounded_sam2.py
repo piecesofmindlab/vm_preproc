@@ -142,5 +142,18 @@ def text_to_mask(images,
             scores_out.append(None)
             logits_out.append(None)
             labels_out.append(None)
-    
-    return masks_out, scores_out, logits_out, labels_out
+    # Concatenate masks for output
+    # TODO: filter by confidence?
+    # TODO: option to sensibly reinforce flicker-y masks across frames?
+    # Split labels at periods
+    all_labels = [x.strip() for x in text.split('.')]
+    all_labels = [x for x in all_labels if len(x) > 1]
+    # Preallocate output
+    output = np.zeros((len(masks_out), len(all_labels), h, w))
+    for j, (msk, lab) in enumerate(zip(masks_out, labels_out)):
+        if msk is None:
+            continue
+        for li, ll in enumerate(lab):
+            mi, = np.nonzero([x in ll for x in all_labels])
+            output[j, mi] = msk[li]    
+    return output #masks_out, scores_out, logits_out, labels_out
