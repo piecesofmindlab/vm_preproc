@@ -474,7 +474,7 @@ def tilt_slant_hist(tilt,
         return_h = H is True
         tbins = np.linspace(0, 2*np.pi, n_tilt_bins)      # 0 to 360 in steps of 360/N.
         sbins = np.linspace(0, np.pi/2, n_slant_bins) 
-        H, xedges, yedges = np.histogram2d(tilt, slant, bins=(tbins,sbins), normed=True) #, weights=pwr)
+        H, xedges, yedges = np.histogram2d(tilt, slant, bins=(tbins,sbins), density=True) #, weights=pwr)
         #H /= H.sum()
         if do_log:
             #print(H.shape)
