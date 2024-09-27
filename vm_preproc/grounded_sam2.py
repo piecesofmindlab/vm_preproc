@@ -149,11 +149,11 @@ def text_to_mask(images,
     all_labels = [x.strip() for x in text.split('.')]
     all_labels = [x for x in all_labels if len(x) > 1]
     # Preallocate output
-    output = np.zeros((len(masks_out), len(all_labels), h, w))
+    output = np.zeros((len(masks_out), len(all_labels), h, w), dtype=bool)
     for j, (msk, lab) in enumerate(zip(masks_out, labels_out)):
         if msk is None:
             continue
         for li, ll in enumerate(lab):
             mi, = np.nonzero([x in ll for x in all_labels])
-            output[j, mi] = msk[li]    
+            output[j, mi] = msk[li] > 0 
     return output #masks_out, scores_out, logits_out, labels_out
