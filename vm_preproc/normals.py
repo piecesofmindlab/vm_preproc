@@ -89,6 +89,7 @@ def compute_distance_orientation_bins(normals,
                                       n_bins_x=1,
                                       n_bins_y=1,
                                       ori_norm=2,
+                                      flip_norm_x=False,
                                       progress_bar=tqdm.tqdm,
                                       ):
     """Compute % of pixels in specified distance & orientation bins
@@ -134,7 +135,8 @@ def compute_distance_orientation_bins(normals,
     # Mask out skies in distance images based on sky_mask, if available
     if sky_mask is not None:
         distance[sky_mask] = 1000
-
+    if flip_norm_x:
+        normals[:,:,0] = -normals[:,:,0]
     bins_x = np.linspace(0, 1, n_bins_x+1)
     bins_x[-1] = np.inf
     bins_y = np.linspace(0, 1, n_bins_y+1)
