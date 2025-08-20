@@ -209,12 +209,18 @@ class DataSet(object):
         self._n_frames = None
         self._data = data
 
-    def load(self, variable_name=None, idx=None, **kwargs):
+    def load(self, variable_name=None, idx=None, post_proc_functions=None, **kwargs):
         """Load data into memory"""
         if self._data is None:
             if variable_name is None:
                 variable_name = self.variable_name
-            return file_io.load_array(self.fpath, variable_name, idx=idx, **kwargs)
+            out = file_io.load_array(self.fpath, variable_name, idx=idx, **kwarg)
+            if post_proc_functions is None:
+                if not isinstance(post_proc_functions, list):
+                    post_proc_functions = [post_proc_functions]
+                for fn in post_proc_functions:
+                    out = fn(out)
+            return out
         else: 
             if idx is None:
                 return self._data
@@ -288,6 +294,7 @@ def batch_run(fn, inpt,
     batch_combine_fn=np.vstack,
     sleep_time=0.3,
     load_kws=None,
+    post_proc_functions=None,
     #first_frame=None, # TO DO?
     #last_frame=None, # TO DO? 
     **kwargs):
@@ -373,7 +380,7 @@ def batch_run(fn, inpt,
             float64=8,
             )
         # Load first frame
-        tmp = inpt.load(idx=(0, 1))
+        tmp = inpt.load(idx=(0, 1), post_proc_functions=post_proc_functions, **load_kws)
         if isinstance(tmp, dict):
             n_bytes = np.sum([np.prod(v.shape) * dtype_bytes[str(v.dtype)] for v in tmp.values()])
         else:
@@ -430,9 +437,9 @@ def batch_run(fn, inpt,
             idx = (st, fin)
             # Load input
             if 'variable_name' in kws:
-                stim = inpt.load(idx=idx, variable_name=kws['variable_name'], **load_kws)
+                stim = inpt.load(idx=idx, variable_name=kws['variable_name'], post_proc_functions=post_proc_functions, **load_kws)
             else:
-                stim = inpt.load(idx=idx, **load_kws)
+                stim = inpt.load(idx=idx, post_proc_functions=post_proc_functions, **load_kws)
             if ('progress_bar' not in kws) and ('progress_bar' in kwargs):
                 _ = kwargs.pop('progress_bar')
             # Run function on this batch
