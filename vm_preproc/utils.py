@@ -165,7 +165,10 @@ def get_default_kwargs(fn):
     fn : function
         function for which to get kws
     """
-    kws = inspect.getargspec(fn)
+    try:
+        kws = inspect.getargspec(fn)
+    except:
+        kws = inspect.getargfullspec(fn)
     defaults = dict(zip(kws.args[-len(kws.defaults):], kws.defaults))
     return defaults
 
