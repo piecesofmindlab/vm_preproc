@@ -25,7 +25,7 @@ def get_masks_from_result(r, H=600, W=600,
         for inst in sm:
             if inst.shape != (H, W):
                 inst = cv2.resize(inst, (W, H), interpolation=cv2.INTER_NEAREST)
-            mask |= (inst > MASK_THRESHOLD)
+            mask |= (inst > mask_threshold)
     return mask
 
 def run_yolov12_bodies(data, 
