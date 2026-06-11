@@ -168,7 +168,7 @@ def get_default_kwargs(fn):
     try:
         kws = inspect.getargspec(fn)
     except:
-        kws = inspect.getargfullspec(fn)
+        kws = inspect.getfullargspec(fn)
     defaults = dict(zip(kws.args[-len(kws.defaults):], kws.defaults))
     return defaults
 
