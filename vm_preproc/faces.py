@@ -10,6 +10,21 @@ FaceDetectorOptions = mp.tasks.vision.FaceDetectorOptions
 VisionRunningMode = mp.tasks.vision.RunningMode
 
 
+def _process_detection(detections, image_size):
+    """process detections from mediapipe bounding boxes
+    """
+    out = []
+    for d in detections:
+        this_detection = dict(
+            bbox=[d.bounding_box.origin_x / image_size[1], 
+                  d.bounding_box.origin_y / image_size[0],
+                  d.bounding_box.width / image_size[1],
+                  d.bounding_box.height / image_size[0]],
+            kpts=[(d.x, d.y) for d in det.keypoints],
+                  )
+        out.append(this_detection)
+    return out
+
 def run_mediapipe_faces(data, model_name='blaze_face_full_range.tflite', mode='image'):
     """Detect faces using mediapipe
 
@@ -43,5 +58,6 @@ def run_mediapipe_faces(data, model_name='blaze_face_full_range.tflite', mode='i
     for fr in range(n_frames):
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=data[fr])
         face_detector_result = detector.detect(mp_image)
-        out.append(face_detector_result)
+        out.append(_process_detection(face_detector_result.detections))
+
     return out
