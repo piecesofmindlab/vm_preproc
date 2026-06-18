@@ -362,7 +362,7 @@ def batch_run(fn, inpt,
     if isinstance(n_frames, dict):
         n_fr_ = np.array(list(n_frames.values()))
         if not np.all(n_fr_[0]==n_fr_[1:]):
-            mx_diff = np.max(n_fr[1:] - n_fr_[0])
+            mx_diff = np.max(n_fr_[1:] - n_fr_[0])
             if mx_diff == 1:
                 # Off-by-one error. Shit. Maybe disallow. for now, allow... (SHADY)
                 pass # See min below
@@ -428,6 +428,9 @@ def batch_run(fn, inpt,
         # Remove progress bar kwarg if not supported
         if (not 'progress_bar' in kws_fn) and ('progress_bar' in kwargs):
             _ = kwargs.pop('progress_bar')
+        # Add post_proc_functions if supported
+        if ('post_proc_functions' in kws):
+            kwargs['post_proc_functions'] = post_proc_functions
         print('Running %d batches'%n_batches)
         for ibatch in range(n_batches):
             print(f"Running batch {ibatch} / {n_batches}")
@@ -437,9 +440,9 @@ def batch_run(fn, inpt,
             idx = (st, fin)
             # Load input
             if 'variable_name' in kws:
-                stim = inpt.load(idx=idx, variable_name=kws['variable_name'], post_proc_functions=post_proc_functions, **load_kws)
+                stim = inpt.load(idx=idx, variable_name=kws['variable_name'], **load_kws)
             else:
-                stim = inpt.load(idx=idx, post_proc_functions=post_proc_functions, **load_kws)
+                stim = inpt.load(idx=idx, **load_kws)
             if ('progress_bar' not in kws) and ('progress_bar' in kwargs):
                 _ = kwargs.pop('progress_bar')
             # Run function on this batch
