@@ -36,9 +36,9 @@ __all__ = ['utils',
 	'openpose']
 
 # Soft imports of torch / GPU dependent code
-try:
-    from . import alexnet_pyt
-    from . import resnet_pyt
-    __all__ += ['alexnet_pyt', 'resnet_pyt']
-except ImportError:
-    print("No pytorch modules available.")
+#try:
+#    from . import alexnet_pyt
+#    from . import resnet_pyt
+#    __all__ += ['alexnet_pyt', 'resnet_pyt']
+#except ImportError:
+#    print("No pytorch modules available.")
