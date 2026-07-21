@@ -214,8 +214,8 @@ class DataSet(object):
         if self._data is None:
             if variable_name is None:
                 variable_name = self.variable_name
-            out = file_io.load_array(self.fpath, variable_name, idx=idx, **kwarg)
-            if post_proc_functions is None:
+            out = file_io.load_array(self.fpath, variable_name, idx=idx, **kwargs)
+            if post_proc_functions is not None:
                 if not isinstance(post_proc_functions, list):
                     post_proc_functions = [post_proc_functions]
                 for fn in post_proc_functions:
@@ -421,7 +421,7 @@ def batch_run(fn, inpt,
     # Try loop to make sure output file is not left dangling & open
     # Consider replacing with `with` call?
     try:
-        kws = get_default_kwargs(inpt.load)
+        kws_load = get_default_kwargs(inpt.load)
         kws_fn = get_default_kwargs(fn)
         if load_kws is None:
             load_kws = {}
@@ -429,7 +429,7 @@ def batch_run(fn, inpt,
         if (not 'progress_bar' in kws_fn) and ('progress_bar' in kwargs):
             _ = kwargs.pop('progress_bar')
         # Add post_proc_functions if supported
-        if ('post_proc_functions' in kws):
+        if ('post_proc_functions' in kws_fn):
             kwargs['post_proc_functions'] = post_proc_functions
         print('Running %d batches'%n_batches)
         for ibatch in range(n_batches):
@@ -439,11 +439,11 @@ def batch_run(fn, inpt,
             fin = np.min([(ibatch + 1) * batch_size, n_frames])
             idx = (st, fin)
             # Load input
-            if 'variable_name' in kws:
-                stim = inpt.load(idx=idx, variable_name=kws['variable_name'], **load_kws)
+            if 'variable_name' in kws_load:
+                stim = inpt.load(idx=idx, variable_name=kws_load['variable_name'], **load_kws)
             else:
                 stim = inpt.load(idx=idx, **load_kws)
-            if ('progress_bar' not in kws) and ('progress_bar' in kwargs):
+            if ('progress_bar' not in kws_fn) and ('progress_bar' in kwargs):
                 _ = kwargs.pop('progress_bar')
             # Run function on this batch
             if isinstance(stim, dict):
@@ -517,4 +517,5 @@ def batch_run(fn, inpt,
             outpt.close()
         elif output_option=='video':
             outpt.stop()
-        raise Exception("Failed during run!")
+        print("Failed during run!")
+        raise
