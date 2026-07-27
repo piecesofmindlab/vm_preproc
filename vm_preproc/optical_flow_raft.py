@@ -65,7 +65,7 @@ def run_optical_flow(s, center_crop=None, scale=512, tensor=True, normalize=Fals
     a, b = transform_raft(x[:-1], x[1:])
     #print(a.shape, b.shape)
     out = []
-    for j in tqdm.notebook.tqdm(range(len(a))):
+    for j in tqdm.tqdm(range(len(a))):
         list_of_flows = net(a[j:j+1].to(device), b[j:j+1].to(device))
         if device == 'cuda':
             out.append(list_of_flows[-1].detach().cpu().numpy())
