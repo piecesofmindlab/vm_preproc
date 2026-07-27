@@ -165,7 +165,7 @@ def get_default_kwargs(fn):
     fn : function
         function for which to get kws
     """
-    kws = inspect.getargspec(fn)
+    kws = inspect.getfullargspec(fn)
     defaults = dict(zip(kws.args[-len(kws.defaults):], kws.defaults))
     return defaults
 
@@ -214,8 +214,8 @@ class DataSet(object):
         if self._data is None:
             if variable_name is None:
                 variable_name = self.variable_name
-            out = file_io.load_array(self.fpath, variable_name, idx=idx, **kwarg)
-            if post_proc_functions is None:
+            out = file_io.load_array(self.fpath, variable_name, idx=idx, **kwargs)
+            if post_proc_functions is not None:
                 if not isinstance(post_proc_functions, list):
                     post_proc_functions = [post_proc_functions]
                 for fn in post_proc_functions:
@@ -295,6 +295,7 @@ def batch_run(fn, inpt,
     sleep_time=0.3,
     load_kws=None,
     post_proc_functions=None,
+    progressive_save=True,
     #first_frame=None, # TO DO?
     #last_frame=None, # TO DO? 
     **kwargs):
@@ -313,7 +314,7 @@ def batch_run(fn, inpt,
         iterable objects
     output_file : string or None
         If a string is provided, output is written the file specified by the string
-        Specified files currently must be .hdf or .mp4
+        Specified files currently must be .hdf, .mp4, or .npz
     multiple_outputs : string
         Specifies how to handle multiple out puts from `fn`. Currently WIP; only 
         currently available option is to take first output ('discard' the rest)
@@ -362,7 +363,7 @@ def batch_run(fn, inpt,
     if isinstance(n_frames, dict):
         n_fr_ = np.array(list(n_frames.values()))
         if not np.all(n_fr_[0]==n_fr_[1:]):
-            mx_diff = np.max(n_fr[1:] - n_fr_[0])
+            mx_diff = np.max(n_fr_[1:] - n_fr_[0])
             if mx_diff == 1:
                 # Off-by-one error. Shit. Maybe disallow. for now, allow... (SHADY)
                 pass # See min below
@@ -411,6 +412,11 @@ def batch_run(fn, inpt,
             output_option = 'hdf'
             outpt = h5py.File(output_file, mode='w')
             # Create output variable dataset in hdf file?
+        elif ext in ('.npz',):
+            output_option = 'npz'
+            if progressive_save:
+                raise ValueError("Please use an .hdf file as output if you require progressive saving")
+            outpt = []
         else:
             raise ValueError('Unsupported output type.')
     else:
@@ -421,13 +427,16 @@ def batch_run(fn, inpt,
     # Try loop to make sure output file is not left dangling & open
     # Consider replacing with `with` call?
     try:
-        kws = get_default_kwargs(inpt.load)
+        kws_load = get_default_kwargs(inpt.load)
         kws_fn = get_default_kwargs(fn)
         if load_kws is None:
             load_kws = {}
         # Remove progress bar kwarg if not supported
         if (not 'progress_bar' in kws_fn) and ('progress_bar' in kwargs):
             _ = kwargs.pop('progress_bar')
+        # Add post_proc_functions if supported
+        if ('post_proc_functions' in kws_fn):
+            kwargs['post_proc_functions'] = post_proc_functions
         print('Running %d batches'%n_batches)
         for ibatch in range(n_batches):
             print(f"Running batch {ibatch} / {n_batches}")
@@ -436,11 +445,11 @@ def batch_run(fn, inpt,
             fin = np.min([(ibatch + 1) * batch_size, n_frames])
             idx = (st, fin)
             # Load input
-            if 'variable_name' in kws:
-                stim = inpt.load(idx=idx, variable_name=kws['variable_name'], post_proc_functions=post_proc_functions, **load_kws)
+            if 'variable_name' in kws_load:
+                stim = inpt.load(idx=idx, variable_name=kws_load['variable_name'], **load_kws)
             else:
-                stim = inpt.load(idx=idx, post_proc_functions=post_proc_functions, **load_kws)
-            if ('progress_bar' not in kws) and ('progress_bar' in kwargs):
+                stim = inpt.load(idx=idx, **load_kws)
+            if ('progress_bar' not in kws_fn) and ('progress_bar' in kwargs):
                 _ = kwargs.pop('progress_bar')
             # Run function on this batch
             if isinstance(stim, dict):
@@ -459,59 +468,70 @@ def batch_run(fn, inpt,
                     # ASSUME integer index; needs check / assertion statement here
                     out = out[multiple_outputs]
             # Map output to file if desired
-            if output_option=='video':
-                # Write frames to video writer object
-                for o_ in out:
-                    outpt.write(o_)
-            elif output_option=='hdf':
-                # Write indices to hdf file object
-                if ibatch==0:
-                    # For first batch, create dataset
-                    # First, check for downsampling of data:
-                    if isinstance(stim, dict):
-                        n_frames_batch = list(stim.values())[0].shape[0]
-                    else: 
-                        n_frames_batch = stim.shape[0]
-                    n_frames_output = out.shape[0]
-                    if n_frames_output < n_frames_batch:
-                        if 'extra_frame_threshold' in kwargs:
-                            ds_factor = int(np.floor(kwargs['input_hz'] / kwargs['output_hz']))
-                            extra_frames = n_frames % ds_factor
-                            to_add = 1 if extra_frames > kwargs['extra_frame_threshold'] else 0
-                            n_frames_out = n_frames // ds_factor + to_add
+            if progressive_save:
+                if output_option=='video':
+                    # Write frames to video writer object
+                    for o_ in out:
+                        outpt.write(o_)
+                elif output_option=='hdf':
+                    # Write indices to hdf file object
+                    if ibatch==0:
+                        # For first batch, create dataset
+                        # First, check for downsampling of data:
+                        if isinstance(stim, dict):
+                            n_frames_batch = list(stim.values())[0].shape[0]
+                        else: 
+                            n_frames_batch = stim.shape[0]
+                        n_frames_output = out.shape[0]
+                        if n_frames_output < n_frames_batch:
+                            if 'extra_frame_threshold' in kwargs:
+                                ds_factor = int(np.floor(kwargs['input_hz'] / kwargs['output_hz']))
+                                extra_frames = n_frames % ds_factor
+                                to_add = 1 if extra_frames > kwargs['extra_frame_threshold'] else 0
+                                n_frames_out = n_frames // ds_factor + to_add
+                            else:
+                                # If present, compute downsampling factor
+                                ds_factor = n_frames_batch / n_frames_output
+                                tolerance = 1e-6
+                                if ds_factor % 1 > tolerance:
+                                    raise ValueError("Downsampling by non-integer factor detected; I die now.")
+                                n_frames_out = int(n_frames / ds_factor)
                         else:
-                            # If present, compute downsampling factor
-                            ds_factor = n_frames_batch / n_frames_output
-                            tolerance = 1e-6
-                            if ds_factor % 1 > tolerance:
-                                raise ValueError("Downsampling by non-integer factor detected; I die now.")
-                            n_frames_out = int(n_frames / ds_factor)
-                    else:
-                        ds_factor = 1.0
-                        n_frames_out = n_frames
-                    # Create dataset output
-                    dshape = (n_frames_out, *out.shape[1:])
-                    outpt.create_dataset('data', dtype=out.dtype, shape=dshape, compression='gzip')
-                
-                oidx = [int(st / ds_factor), int(st / ds_factor) + n_frames_output]
-                outpt['data'][oidx[0]:oidx[1]] = out
+                            ds_factor = 1.0
+                            n_frames_out = n_frames
+                        # Create dataset output
+                        dshape = (n_frames_out, *out.shape[1:])
+                        outpt.create_dataset('data', dtype=out.dtype, shape=dshape, compression='gzip')
+                    
+                    oidx = [int(st / ds_factor), int(st / ds_factor) + n_frames_output]
+                    outpt['data'][oidx[0]:oidx[1]] = out
             else:
                 # No file output; concatenate results as array
                 outpt.append(out)
             # Stall (maybe (?) helps some sub-processes complete)
             time.sleep(sleep_time)
         # Having finished batches, manage output
+        if not progressive_save:
+            out = batch_combine_fn(outpt)
         if output_file is None:
-            return batch_combine_fn(outpt)
+            return out
         else: 
-            if output_option=='hdf':
-                outpt.close()
-            elif output_option=='video':
-                outpt.stop()
+            if progressive_save:
+                if output_option=='hdf':
+                    outpt.close()
+                elif output_option=='video':
+                    outpt.stop()
+            else:
+                if output_option in ('hdf', 'npz'):
+                    file_io.save_array(output_file, data=out)
+                else:
+                    # Video. Terrible idea.
+                    pass
     except:
         # Close output files
         if output_option=='hdf':
             outpt.close()
         elif output_option=='video':
             outpt.stop()
-        raise Exception("Failed during run!")
+        print("Failed during run!")
+        raise
